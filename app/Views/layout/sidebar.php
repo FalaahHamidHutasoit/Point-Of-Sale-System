@@ -1,6 +1,11 @@
+<?php
+$role = session()->get('role');
+$nama = session()->get('nama_lengkap');
+?>
+
 <div class="sidebar">
 
-    <!-- LOGO -->
+    <!-- BRAND -->
     <div class="sidebar-brand">
 
         <div class="brand-icon">
@@ -18,120 +23,93 @@
     <!-- MENU -->
     <div class="sidebar-menu">
 
+        <!-- DASHBOARD -->
         <div class="menu-title">
             MENU UTAMA
         </div>
 
-        <a href="<?= base_url('/dashboard') ?>"
-           class="menu-item">
-
-            <i class="bi bi-grid-1x2-fill"></i>
-
-            <span>Dashboard</span>
-
+        <a href="<?= base_url('dashboard') ?>" class="sidebar-link">
+            <i class="bi bi-speedometer2"></i>
+            Dashboard
         </a>
 
 
-        <div class="menu-title">
-            MASTER DATA
-        </div>
+        <?php if ($role === 'admin'): ?>
+
+            <!-- MASTER DATA -->
+            <div class="menu-title mt-4">
+                MASTER DATA
+            </div>
+
+            <a href="<?= base_url('kategori') ?>" class="sidebar-link">
+                <i class="bi bi-tags"></i>
+                Kategori
+            </a>
+
+            <a href="<?= base_url('barang') ?>" class="sidebar-link">
+                <i class="bi bi-box-seam"></i>
+                Barang
+            </a>
+
+            <a href="<?= base_url('customer') ?>" class="sidebar-link">
+                <i class="bi bi-people"></i>
+                Customer
+            </a>
+
+            <a href="<?= base_url('supplier') ?>" class="sidebar-link">
+                <i class="bi bi-truck"></i>
+                Supplier
+            </a>
 
 
-        <a href="<?= base_url('/kategori') ?>"
-           class="menu-item">
+            <!-- TRANSAKSI -->
+            <div class="menu-title mt-4">
+                MASTER DATA
+            </div>
 
-            <i class="bi bi-tags-fill"></i>
-
-            <span>Kategori</span>
-
-        </a>
-
-
-        <a href="<?= base_url('/barang') ?>"
-           class="menu-item">
-
-            <i class="bi bi-box-seam-fill"></i>
-
-            <span>Barang</span>
-
-        </a>
+            <a href="<?= base_url('penjualan/riwayat') ?>" class="sidebar-link">
+            <i class="bi bi-clock-history"></i>
+            Riwayat Transaksi
+            </a>
 
 
-        <a href="<?= base_url('/customer') ?>"
-           class="menu-item">
+        <?php endif; ?>
 
-            <i class="bi bi-people-fill"></i>
-
-            <span>Customer</span>
-
-        </a>
-
-
-        <a href="<?= base_url('/supplier') ?>"
-           class="menu-item">
-
-            <i class="bi bi-truck"></i>
-
-            <span>Supplier</span>
-
-        </a>
-
-
-        <div class="menu-title">
+         <?php if ($role === 'kasir'): ?>
+        <!-- TRANSAKSI -->
+        <div class="menu-title mt-4">
             TRANSAKSI
         </div>
 
-
-        <a href="<?= base_url('/penjualan') ?>"
-           class="menu-item">
-
-           
-            <i class="bi bi-cart-check-fill"></i>
-
-            <span>Penjualan</span>
-
+        <a href="<?= base_url('penjualan') ?>" class="sidebar-link">
+            <i class="bi bi-cart3"></i>
+            Penjualan
         </a>
 
-        <a
-            href="<?= base_url('penjualan/riwayat') ?>"
-            class="sidebar-link"
-        >
+        <a href="<?= base_url('penjualan/riwayat') ?>" class="sidebar-link">
             <i class="bi bi-clock-history"></i>
             Riwayat Transaksi
         </a>
+            <?php endif; ?>
 
+        <?php if ($role === 'admin'): ?>
 
-        <div class="menu-title">
-            LAPORAN
-        </div>
+            <!-- LAPORAN -->
+            <div class="menu-title mt-4">
+                LAPORAN
+            </div>
 
+            <a href="<?= base_url('laporan/barang') ?>" class="sidebar-link">
+                <i class="bi bi-boxes"></i>
+                Laporan Barang
+            </a>
 
-        <a href="<?= base_url('/laporan/barang') ?>"
-           class="menu-item">
+            <a href="<?= base_url('laporan/penjualan') ?>" class="sidebar-link">
+                <i class="bi bi-bar-chart-line"></i>
+                Laporan Penjualan
+            </a>
 
-            <i class="bi bi-boxes"></i>
-
-            <span>Laporan Barang</span>
-
-        </a>
-
-        <a
-            href="<?= base_url('laporan/penjualan') ?>"
-            class="sidebar-link"
-        >
-            <i class="bi bi-bar-chart-line"></i>
-            Laporan Penjualan
-        </a>
-
-
-        <a href="<?= base_url('/laporan/penjualan') ?>"
-           class="menu-item">
-
-            <i class="bi bi-file-earmark-bar-graph-fill"></i>
-
-            <span>Laporan Penjualan</span>
-
-        </a>
+        <?php endif; ?>
 
     </div>
 
@@ -148,11 +126,11 @@
             <div>
 
                 <strong>
-                    <?= esc(session()->get('nama_lengkap') ?? 'User') ?>
+                    <?= esc($nama) ?>
                 </strong>
 
                 <small>
-                    <?= esc(ucfirst(session()->get('role') ?? '')) ?>
+                    <?= esc(ucfirst($role)) ?>
                 </small>
 
             </div>
@@ -160,8 +138,7 @@
         </div>
 
 
-        <a href="<?= base_url('/logout') ?>"
-           class="btn btn-danger btn-sm w-100 mt-3">
+        <a href="<?= base_url('logout') ?>" class="logout-btn">
 
             <i class="bi bi-box-arrow-right"></i>
 
@@ -172,19 +149,16 @@
     </div>
 
 </div>
-
-
 <style>
 
 .sidebar {
 
     position: fixed;
 
-    top: 0;
     left: 0;
+    top: 0;
 
     width: 260px;
-
     height: 100vh;
 
     background: #111827;
@@ -204,7 +178,7 @@
 
 .sidebar-brand {
 
-    padding: 25px 20px;
+    height: 80px;
 
     display: flex;
 
@@ -212,18 +186,20 @@
 
     gap: 12px;
 
-    border-bottom: 1px solid #273244;
+    padding: 0 22px;
+
+    border-bottom: 1px solid rgba(255,255,255,.08);
 
 }
 
 .brand-icon {
 
-    width: 42px;
-    height: 42px;
-
-    background: #2563eb;
+    width: 40px;
+    height: 40px;
 
     border-radius: 10px;
+
+    background: #2563eb;
 
     display: flex;
 
@@ -238,7 +214,7 @@
 
     margin: 0;
 
-    font-weight: 600;
+    font-weight: 700;
 
 }
 
@@ -253,32 +229,32 @@
 
 .sidebar-menu {
 
-    padding: 20px 12px;
-
     flex: 1;
 
     overflow-y: auto;
+
+    padding: 20px 14px;
 
 }
 
 .menu-title {
 
-    font-size: 11px;
+    font-size: 12px;
+
+    font-weight: 700;
 
     color: #6b7280;
 
-    font-weight: 600;
+    letter-spacing: 1px;
 
-    margin:
+    padding: 0 12px;
 
-        18px 10px 8px;
-
-    letter-spacing: .5px;
+    margin-bottom: 8px;
 
 }
 
 
-.menu-item {
+.sidebar-link {
 
     display: flex;
 
@@ -290,25 +266,25 @@
 
     margin-bottom: 4px;
 
+    border-radius: 8px;
+
     color: #d1d5db;
 
     text-decoration: none;
-
-    border-radius: 8px;
 
     transition: .2s;
 
 }
 
 
-.menu-item i {
+.sidebar-link i {
 
-    font-size: 17px;
+    font-size: 18px;
 
 }
 
 
-.menu-item:hover {
+.sidebar-link:hover {
 
     background: #1f2937;
 
@@ -317,7 +293,7 @@
 }
 
 
-.menu-item.active {
+.sidebar-link.active {
 
     background: #2563eb;
 
@@ -332,7 +308,9 @@
 
     padding: 18px;
 
-    border-top: 1px solid #273244;
+    border-top: 1px solid rgba(255,255,255,.08);
+
+    background: #111827;
 
 }
 
@@ -343,25 +321,28 @@
 
     align-items: center;
 
-    gap: 10px;
+    gap: 12px;
+
+    margin-bottom: 15px;
 
 }
 
 
 .user-icon {
 
-    width: 38px;
-
-    height: 38px;
-
-    background: #374151;
+    width: 46px;
+    height: 46px;
 
     border-radius: 50%;
+
+    background: #374151;
 
     display: flex;
 
     align-items: center;
     justify-content: center;
+
+    font-size: 20px;
 
 }
 
@@ -370,16 +351,54 @@
 
     display: block;
 
-    font-size: 13px;
+    color: white;
 
 }
 
 
 .user-info small {
 
+    display: block;
+
     color: #9ca3af;
 
-    font-size: 11px;
+    margin-top: 3px;
+
+}
+
+
+.logout-btn {
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+    gap: 8px;
+
+    width: 100%;
+
+    padding: 10px;
+
+    border-radius: 6px;
+
+    background: #e3344f;
+
+    color: white;
+
+    text-decoration: none;
+
+    font-weight: 500;
+
+}
+
+
+.logout-btn:hover {
+
+    background: #c8233d;
+
+    color: white;
 
 }
 
