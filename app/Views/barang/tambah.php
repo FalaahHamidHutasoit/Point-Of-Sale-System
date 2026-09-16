@@ -1,221 +1,336 @@
-<!DOCTYPE html>
-<html lang="id">
+<?= view('layout/header', ['title' => 'Tambah Barang']) ?>
+<?= view('layout/sidebar') ?>
 
-<head>
+<div class="main-content">
 
-    <meta charset="UTF-8">
+    <!-- HEADER -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
 
-    <meta name="viewport"
-          content="width=device-width, initial-scale=1.0">
+        <div>
+            <h2 class="fw-bold mb-1">
+                Tambah Barang
+            </h2>
 
-    <title>Tambah Barang</title>
+            <p class="text-muted mb-0">
+                Tambahkan barang baru ke dalam data inventaris.
+            </p>
+        </div>
 
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
-          rel="stylesheet">
+        <a href="<?= base_url('/barang') ?>"
+           class="btn btn-outline-secondary">
 
-</head>
+            <i class="bi bi-arrow-left me-1"></i>
+            Kembali
 
-<body>
+        </a>
 
-<div class="container py-5">
+    </div>
 
-    <div class="row justify-content-center">
 
-        <div class="col-lg-8">
+    <!-- ERROR -->
+    <?php if (session()->getFlashdata('error')) : ?>
 
-            <div class="card shadow-sm border-0">
+        <div class="alert alert-danger border-0 shadow-sm">
 
-                <div class="card-body p-4">
+            <i class="bi bi-exclamation-triangle-fill me-2"></i>
 
-                    <h3 class="fw-bold mb-4">
-                        Tambah Barang
-                    </h3>
+            <?= session()->getFlashdata('error') ?>
 
+        </div>
 
-                    <?php if (session()->getFlashdata('error')) : ?>
+    <?php endif; ?>
 
-                        <div class="alert alert-danger">
 
-                            <?= session()->getFlashdata('error') ?>
+    <!-- FORM CARD -->
+    <div class="card border-0 shadow-sm">
 
-                        </div>
+        <div class="card-body p-4">
 
-                    <?php endif; ?>
+            <!-- FORM TITLE -->
+            <div class="d-flex align-items-center mb-4">
 
+                <div class="bg-primary bg-opacity-10 text-primary rounded-3 p-3 me-3">
 
-                    <form action="<?= base_url('/barang/simpan') ?>"
-                          method="post">
+                    <i class="bi bi-plus-circle fs-4"></i>
 
-                        <?= csrf_field() ?>
+                </div>
 
+                <div>
 
-                        <div class="row">
+                    <h5 class="fw-bold mb-1">
+                        Informasi Barang
+                    </h5>
 
-                            <!-- KODE -->
-                            <div class="col-md-6 mb-3">
-
-                                <label class="form-label">
-                                    Kode Barang
-                                </label>
-
-                                <input type="text"
-                                       name="kode_barang"
-                                       class="form-control"
-                                       placeholder="Contoh: BRG001"
-                                       value="<?= old('kode_barang') ?>"
-                                       required>
-
-                            </div>
-
-
-                            <!-- KATEGORI -->
-                            <div class="col-md-6 mb-3">
-
-                                <label class="form-label">
-                                    Kategori
-                                </label>
-
-                                <select name="id_kategori"
-                                        class="form-select"
-                                        required>
-
-                                    <option value="">
-                                        -- Pilih Kategori --
-                                    </option>
-
-                                    <?php foreach ($kategori as $kat) : ?>
-
-                                        <option value="<?= $kat['id_kategori'] ?>"
-                                            <?= old('id_kategori') == $kat['id_kategori'] ? 'selected' : '' ?>>
-
-                                            <?= esc($kat['nama_kategori']) ?>
-
-                                        </option>
-
-                                    <?php endforeach; ?>
-
-                                </select>
-
-                            </div>
-
-
-                            <!-- NAMA -->
-                            <div class="col-md-12 mb-3">
-
-                                <label class="form-label">
-                                    Nama Barang
-                                </label>
-
-                                <input type="text"
-                                       name="nama_barang"
-                                       class="form-control"
-                                       placeholder="Contoh: Indomie Goreng"
-                                       value="<?= old('nama_barang') ?>"
-                                       required>
-
-                            </div>
-
-
-                            <!-- HARGA BELI -->
-                            <div class="col-md-6 mb-3">
-
-                                <label class="form-label">
-                                    Harga Beli
-                                </label>
-
-                                <input type="number"
-                                       name="harga_beli"
-                                       class="form-control"
-                                       min="0"
-                                       value="<?= old('harga_beli', 0) ?>"
-                                       required>
-
-                            </div>
-
-
-                            <!-- HARGA JUAL -->
-                            <div class="col-md-6 mb-3">
-
-                                <label class="form-label">
-                                    Harga Jual
-                                </label>
-
-                                <input type="number"
-                                       name="harga_jual"
-                                       class="form-control"
-                                       min="0"
-                                       value="<?= old('harga_jual', 0) ?>"
-                                       required>
-
-                            </div>
-
-
-                            <!-- STOK -->
-                            <div class="col-md-6 mb-3">
-
-                                <label class="form-label">
-                                    Stok
-                                </label>
-
-                                <input type="number"
-                                       name="stok"
-                                       class="form-control"
-                                       min="0"
-                                       value="<?= old('stok', 0) ?>"
-                                       required>
-
-                            </div>
-
-
-                            <!-- SATUAN -->
-                            <div class="col-md-6 mb-3">
-
-                                <label class="form-label">
-                                    Satuan
-                                </label>
-
-                                <select name="satuan"
-                                        class="form-select"
-                                        required>
-
-                                    <option value="pcs">Pcs</option>
-                                    <option value="box">Box</option>
-                                    <option value="pack">Pack</option>
-                                    <option value="kg">Kg</option>
-                                    <option value="liter">Liter</option>
-                                    <option value="botol">Botol</option>
-
-                                </select>
-
-                            </div>
-
-                        </div>
-
-
-                        <div class="mt-3">
-
-                            <a href="<?= base_url('/barang') ?>"
-                               class="btn btn-secondary">
-
-                                Kembali
-
-                            </a>
-
-                            <button type="submit"
-                                    class="btn btn-primary">
-
-                                <i class="bi bi-save"></i>
-                                Simpan Barang
-
-                            </button>
-
-                        </div>
-
-                    </form>
+                    <small class="text-muted">
+                        Isi data barang yang akan ditambahkan.
+                    </small>
 
                 </div>
 
             </div>
+
+
+            <form action="<?= base_url('/barang/simpan') ?>"
+                  method="post">
+
+                <?= csrf_field() ?>
+
+
+                <div class="row g-4">
+
+                    <!-- KODE BARANG -->
+                    <div class="col-md-6">
+
+                        <label class="form-label fw-semibold">
+                            Kode Barang
+                        </label>
+
+                        <div class="input-group">
+
+                            <span class="input-group-text bg-light">
+                                <i class="bi bi-upc-scan"></i>
+                            </span>
+
+                            <input type="text"
+                                   name="kode_barang"
+                                   class="form-control"
+                                   placeholder="Contoh: BRG001"
+                                   value="<?= old('kode_barang') ?>"
+                                   required>
+
+                        </div>
+
+                        <small class="text-muted">
+                            Gunakan kode barang yang unik.
+                        </small>
+
+                    </div>
+
+
+                    <!-- KATEGORI -->
+                    <div class="col-md-6">
+
+                        <label class="form-label fw-semibold">
+                            Kategori
+                        </label>
+
+                        <div class="input-group">
+
+                            <span class="input-group-text bg-light">
+                                <i class="bi bi-tags"></i>
+                            </span>
+
+                            <select name="id_kategori"
+                                    class="form-select"
+                                    required>
+
+                                <option value="">
+                                    -- Pilih Kategori --
+                                </option>
+
+                                <?php foreach ($kategori as $kat) : ?>
+
+                                    <option value="<?= $kat['id_kategori'] ?>"
+                                        <?= old('id_kategori') == $kat['id_kategori'] ? 'selected' : '' ?>>
+
+                                        <?= esc($kat['nama_kategori']) ?>
+
+                                    </option>
+
+                                <?php endforeach; ?>
+
+                            </select>
+
+                        </div>
+
+                    </div>
+
+
+                    <!-- NAMA BARANG -->
+                    <div class="col-12">
+
+                        <label class="form-label fw-semibold">
+                            Nama Barang
+                        </label>
+
+                        <div class="input-group">
+
+                            <span class="input-group-text bg-light">
+                                <i class="bi bi-box-seam"></i>
+                            </span>
+
+                            <input type="text"
+                                   name="nama_barang"
+                                   class="form-control"
+                                   placeholder="Contoh: Indomie Goreng"
+                                   value="<?= old('nama_barang') ?>"
+                                   required>
+
+                        </div>
+
+                    </div>
+
+
+                    <!-- HARGA BELI -->
+                    <div class="col-md-6">
+
+                        <label class="form-label fw-semibold">
+                            Harga Beli
+                        </label>
+
+                        <div class="input-group">
+
+                            <span class="input-group-text bg-light">
+                                Rp
+                            </span>
+
+                            <input type="number"
+                                   name="harga_beli"
+                                   class="form-control"
+                                   min="0"
+                                   placeholder="0"
+                                   value="<?= old('harga_beli', 0) ?>"
+                                   required>
+
+                        </div>
+
+                    </div>
+
+
+                    <!-- HARGA JUAL -->
+                    <div class="col-md-6">
+
+                        <label class="form-label fw-semibold">
+                            Harga Jual
+                        </label>
+
+                        <div class="input-group">
+
+                            <span class="input-group-text bg-light">
+                                Rp
+                            </span>
+
+                            <input type="number"
+                                   name="harga_jual"
+                                   class="form-control"
+                                   min="0"
+                                   placeholder="0"
+                                   value="<?= old('harga_jual', 0) ?>"
+                                   required>
+
+                        </div>
+
+                    </div>
+
+
+                    <!-- STOK -->
+                    <div class="col-md-6">
+
+                        <label class="form-label fw-semibold">
+                            Stok Awal
+                        </label>
+
+                        <div class="input-group">
+
+                            <span class="input-group-text bg-light">
+                                <i class="bi bi-stack"></i>
+                            </span>
+
+                            <input type="number"
+                                   name="stok"
+                                   class="form-control"
+                                   min="0"
+                                   placeholder="0"
+                                   value="<?= old('stok', 0) ?>"
+                                   required>
+
+                        </div>
+
+                        <small class="text-muted">
+                            Masukkan jumlah stok awal barang.
+                        </small>
+
+                    </div>
+
+
+                    <!-- SATUAN -->
+                    <div class="col-md-6">
+
+                        <label class="form-label fw-semibold">
+                            Satuan
+                        </label>
+
+                        <div class="input-group">
+
+                            <span class="input-group-text bg-light">
+                                <i class="bi bi-rulers"></i>
+                            </span>
+
+                            <select name="satuan"
+                                    class="form-select"
+                                    required>
+
+                                <option value="pcs"
+                                    <?= old('satuan') == 'pcs' ? 'selected' : '' ?>>
+                                    Pcs
+                                </option>
+
+                                <option value="box"
+                                    <?= old('satuan') == 'box' ? 'selected' : '' ?>>
+                                    Box
+                                </option>
+
+                                <option value="pack"
+                                    <?= old('satuan') == 'pack' ? 'selected' : '' ?>>
+                                    Pack
+                                </option>
+
+                                <option value="kg"
+                                    <?= old('satuan') == 'kg' ? 'selected' : '' ?>>
+                                    Kg
+                                </option>
+
+                                <option value="liter"
+                                    <?= old('satuan') == 'liter' ? 'selected' : '' ?>>
+                                    Liter
+                                </option>
+
+                                <option value="botol"
+                                    <?= old('satuan') == 'botol' ? 'selected' : '' ?>>
+                                    Botol
+                                </option>
+
+                            </select>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+
+                <!-- ACTION -->
+                <div class="border-top mt-4 pt-4 d-flex justify-content-end gap-2">
+
+                    <a href="<?= base_url('/barang') ?>"
+                       class="btn btn-light border">
+
+                        <i class="bi bi-x-lg me-1"></i>
+                        Batal
+
+                    </a>
+
+                    <button type="submit"
+                            class="btn btn-primary px-4">
+
+                        <i class="bi bi-save me-1"></i>
+                        Simpan Barang
+
+                    </button>
+
+                </div>
+
+            </form>
 
         </div>
 
@@ -223,6 +338,4 @@
 
 </div>
 
-</body>
-
-</html>
+<?= view('layout/footer') ?>

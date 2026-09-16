@@ -1,223 +1,322 @@
-<!DOCTYPE html>
-<html lang="id">
+<?= view('layout/header', ['title' => 'Edit Barang']) ?>
+<?= view('layout/sidebar') ?>
 
-<head>
+<div class="main-content">
 
-    <meta charset="UTF-8">
+    <!-- HEADER -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
 
-    <meta name="viewport"
-          content="width=device-width, initial-scale=1.0">
+        <div>
+            <h2 class="fw-bold mb-1">
+                Edit Barang
+            </h2>
 
-    <title>Edit Barang</title>
+            <p class="text-muted mb-0">
+                Perbarui informasi barang yang tersedia.
+            </p>
+        </div>
 
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
-          rel="stylesheet">
+        <a href="<?= base_url('/barang') ?>"
+           class="btn btn-outline-secondary">
 
-</head>
+            <i class="bi bi-arrow-left me-1"></i>
+            Kembali
+        </a>
 
-<body>
+    </div>
 
-<div class="container py-5">
 
-    <div class="row justify-content-center">
+    <!-- ERROR -->
+    <?php if (session()->getFlashdata('error')) : ?>
 
-        <div class="col-lg-8">
+        <div class="alert alert-danger border-0 shadow-sm">
 
-            <div class="card shadow-sm border-0">
+            <i class="bi bi-exclamation-triangle-fill me-2"></i>
 
-                <div class="card-body p-4">
+            <?= session()->getFlashdata('error') ?>
 
-                    <h3 class="fw-bold mb-4">
-                        Edit Barang
-                    </h3>
+        </div>
 
+    <?php endif; ?>
 
-                    <?php if (session()->getFlashdata('error')) : ?>
 
-                        <div class="alert alert-danger">
+    <!-- FORM CARD -->
+    <div class="card border-0 shadow-sm">
 
-                            <?= session()->getFlashdata('error') ?>
+        <div class="card-body p-4">
 
-                        </div>
+            <div class="d-flex align-items-center mb-4">
 
-                    <?php endif; ?>
+                <div class="bg-primary bg-opacity-10 text-primary rounded-3 p-3 me-3">
 
+                    <i class="bi bi-pencil-square fs-4"></i>
 
-                    <form action="<?= base_url('/barang/update/' . $barang['id_barang']) ?>"
-                          method="post">
+                </div>
 
-                        <?= csrf_field() ?>
+                <div>
 
+                    <h5 class="fw-bold mb-1">
+                        Informasi Barang
+                    </h5>
 
-                        <div class="row">
-
-                            <!-- KODE -->
-                            <div class="col-md-6 mb-3">
-
-                                <label class="form-label">
-                                    Kode Barang
-                                </label>
-
-                                <input type="text"
-                                       name="kode_barang"
-                                       class="form-control"
-                                       value="<?= old('kode_barang', $barang['kode_barang']) ?>"
-                                       required>
-
-                            </div>
-
-
-                            <!-- KATEGORI -->
-                            <div class="col-md-6 mb-3">
-
-                                <label class="form-label">
-                                    Kategori
-                                </label>
-
-                                <select name="id_kategori"
-                                        class="form-select"
-                                        required>
-
-                                    <?php foreach ($kategori as $kat) : ?>
-
-                                        <option value="<?= $kat['id_kategori'] ?>"
-                                            <?= $barang['id_kategori'] == $kat['id_kategori'] ? 'selected' : '' ?>>
-
-                                            <?= esc($kat['nama_kategori']) ?>
-
-                                        </option>
-
-                                    <?php endforeach; ?>
-
-                                </select>
-
-                            </div>
-
-
-                            <!-- NAMA -->
-                            <div class="col-md-12 mb-3">
-
-                                <label class="form-label">
-                                    Nama Barang
-                                </label>
-
-                                <input type="text"
-                                       name="nama_barang"
-                                       class="form-control"
-                                       value="<?= old('nama_barang', $barang['nama_barang']) ?>"
-                                       required>
-
-                            </div>
-
-
-                            <!-- HARGA BELI -->
-                            <div class="col-md-6 mb-3">
-
-                                <label class="form-label">
-                                    Harga Beli
-                                </label>
-
-                                <input type="number"
-                                       name="harga_beli"
-                                       class="form-control"
-                                       min="0"
-                                       value="<?= old('harga_beli', $barang['harga_beli']) ?>"
-                                       required>
-
-                            </div>
-
-
-                            <!-- HARGA JUAL -->
-                            <div class="col-md-6 mb-3">
-
-                                <label class="form-label">
-                                    Harga Jual
-                                </label>
-
-                                <input type="number"
-                                       name="harga_jual"
-                                       class="form-control"
-                                       min="0"
-                                       value="<?= old('harga_jual', $barang['harga_jual']) ?>"
-                                       required>
-
-                            </div>
-
-
-                            <!-- STOK -->
-                            <div class="col-md-6 mb-3">
-
-                                <label class="form-label">
-                                    Stok
-                                </label>
-
-                                <input type="number"
-                                       name="stok"
-                                       class="form-control"
-                                       min="0"
-                                       value="<?= old('stok', $barang['stok']) ?>"
-                                       required>
-
-                            </div>
-
-
-                            <!-- SATUAN -->
-                            <div class="col-md-6 mb-3">
-
-                                <label class="form-label">
-                                    Satuan
-                                </label>
-
-                                <select name="satuan"
-                                        class="form-select"
-                                        required>
-
-                                    <?php
-                                    $satuan = ['pcs', 'box', 'pack', 'kg', 'liter', 'botol'];
-                                    ?>
-
-                                    <?php foreach ($satuan as $s) : ?>
-
-                                        <option value="<?= $s ?>"
-                                            <?= $barang['satuan'] == $s ? 'selected' : '' ?>>
-
-                                            <?= ucfirst($s) ?>
-
-                                        </option>
-
-                                    <?php endforeach; ?>
-
-                                </select>
-
-                            </div>
-
-                        </div>
-
-
-                        <div class="mt-3">
-
-                            <a href="<?= base_url('/barang') ?>"
-                               class="btn btn-secondary">
-
-                                Kembali
-
-                            </a>
-
-                            <button type="submit"
-                                    class="btn btn-primary">
-
-                                <i class="bi bi-save"></i>
-                                Update Barang
-
-                            </button>
-
-                        </div>
-
-                    </form>
+                    <small class="text-muted">
+                        Silakan ubah data barang sesuai kebutuhan.
+                    </small>
 
                 </div>
 
             </div>
+
+
+            <form action="<?= base_url('/barang/update/' . $barang['id_barang']) ?>"
+                  method="post">
+
+                <?= csrf_field() ?>
+
+
+                <div class="row g-4">
+
+                    <!-- KODE BARANG -->
+                    <div class="col-md-6">
+
+                        <label class="form-label fw-semibold">
+                            Kode Barang
+                        </label>
+
+                        <div class="input-group">
+
+                            <span class="input-group-text bg-light">
+                                <i class="bi bi-upc-scan"></i>
+                            </span>
+
+                            <input type="text"
+                                   name="kode_barang"
+                                   class="form-control"
+                                   placeholder="Contoh: BRG001"
+                                   value="<?= old('kode_barang', $barang['kode_barang']) ?>"
+                                   required>
+
+                        </div>
+
+                        <small class="text-muted">
+                            Gunakan kode barang yang unik.
+                        </small>
+
+                    </div>
+
+
+                    <!-- KATEGORI -->
+                    <div class="col-md-6">
+
+                        <label class="form-label fw-semibold">
+                            Kategori
+                        </label>
+
+                        <div class="input-group">
+
+                            <span class="input-group-text bg-light">
+                                <i class="bi bi-tags"></i>
+                            </span>
+
+                            <select name="id_kategori"
+                                    class="form-select"
+                                    required>
+
+                                <?php foreach ($kategori as $kat) : ?>
+
+                                    <option value="<?= $kat['id_kategori'] ?>"
+                                        <?= $barang['id_kategori'] == $kat['id_kategori'] ? 'selected' : '' ?>>
+
+                                        <?= esc($kat['nama_kategori']) ?>
+
+                                    </option>
+
+                                <?php endforeach; ?>
+
+                            </select>
+
+                        </div>
+
+                    </div>
+
+
+                    <!-- NAMA BARANG -->
+                    <div class="col-12">
+
+                        <label class="form-label fw-semibold">
+                            Nama Barang
+                        </label>
+
+                        <div class="input-group">
+
+                            <span class="input-group-text bg-light">
+                                <i class="bi bi-box-seam"></i>
+                            </span>
+
+                            <input type="text"
+                                   name="nama_barang"
+                                   class="form-control"
+                                   placeholder="Masukkan nama barang"
+                                   value="<?= old('nama_barang', $barang['nama_barang']) ?>"
+                                   required>
+
+                        </div>
+
+                    </div>
+
+
+                    <!-- HARGA BELI -->
+                    <div class="col-md-6">
+
+                        <label class="form-label fw-semibold">
+                            Harga Beli
+                        </label>
+
+                        <div class="input-group">
+
+                            <span class="input-group-text bg-light">
+                                Rp
+                            </span>
+
+                            <input type="number"
+                                   name="harga_beli"
+                                   class="form-control"
+                                   min="0"
+                                   placeholder="0"
+                                   value="<?= old('harga_beli', $barang['harga_beli']) ?>"
+                                   required>
+
+                        </div>
+
+                    </div>
+
+
+                    <!-- HARGA JUAL -->
+                    <div class="col-md-6">
+
+                        <label class="form-label fw-semibold">
+                            Harga Jual
+                        </label>
+
+                        <div class="input-group">
+
+                            <span class="input-group-text bg-light">
+                                Rp
+                            </span>
+
+                            <input type="number"
+                                   name="harga_jual"
+                                   class="form-control"
+                                   min="0"
+                                   placeholder="0"
+                                   value="<?= old('harga_jual', $barang['harga_jual']) ?>"
+                                   required>
+
+                        </div>
+
+                    </div>
+
+
+                    <!-- STOK -->
+                    <div class="col-md-6">
+
+                        <label class="form-label fw-semibold">
+                            Stok
+                        </label>
+
+                        <div class="input-group">
+
+                            <span class="input-group-text bg-light">
+                                <i class="bi bi-stack"></i>
+                            </span>
+
+                            <input type="number"
+                                   name="stok"
+                                   class="form-control"
+                                   min="0"
+                                   placeholder="0"
+                                   value="<?= old('stok', $barang['stok']) ?>"
+                                   required>
+
+                        </div>
+
+                        <small class="text-muted">
+                            Jumlah stok barang saat ini.
+                        </small>
+
+                    </div>
+
+
+                    <!-- SATUAN -->
+                    <div class="col-md-6">
+
+                        <label class="form-label fw-semibold">
+                            Satuan
+                        </label>
+
+                        <div class="input-group">
+
+                            <span class="input-group-text bg-light">
+                                <i class="bi bi-rulers"></i>
+                            </span>
+
+                            <?php
+                            $satuan = [
+                                'pcs',
+                                'box',
+                                'pack',
+                                'kg',
+                                'liter',
+                                'botol'
+                            ];
+                            ?>
+
+                            <select name="satuan"
+                                    class="form-select"
+                                    required>
+
+                                <?php foreach ($satuan as $s) : ?>
+
+                                    <option value="<?= $s ?>"
+                                        <?= $barang['satuan'] == $s ? 'selected' : '' ?>>
+
+                                        <?= ucfirst($s) ?>
+
+                                    </option>
+
+                                <?php endforeach; ?>
+
+                            </select>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+
+                <!-- ACTION -->
+                <div class="border-top mt-4 pt-4 d-flex justify-content-end gap-2">
+
+                    <a href="<?= base_url('/barang') ?>"
+                       class="btn btn-light border">
+
+                        <i class="bi bi-x-lg me-1"></i>
+                        Batal
+
+                    </a>
+
+                    <button type="submit"
+                            class="btn btn-primary px-4">
+
+                        <i class="bi bi-save me-1"></i>
+                        Update Barang
+
+                    </button>
+
+                </div>
+
+            </form>
 
         </div>
 
@@ -225,6 +324,4 @@
 
 </div>
 
-</body>
-
-</html>
+<?= view('layout/footer') ?>
