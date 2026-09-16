@@ -34,8 +34,11 @@ class Dashboard extends BaseController
         $totalTransaksi = $this->penjualanModel->countAll();
 
         $stokMenipis = $this->barangModel
-            ->where('stok <=', 5)
-            ->countAllResults();
+        ->select('barang.*, kategori.nama_kategori')
+        ->join('kategori', 'kategori.id_kategori = barang.id_kategori')
+        ->where('barang.stok <=', 5)
+        ->orderBy('barang.stok', 'ASC')
+        ->findAll();
 
         // Total penjualan
         $totalPenjualan = $this->penjualanModel
