@@ -1,1344 +1,1426 @@
 <?= view('layout/header', ['title' => 'Transaksi Penjualan']) ?>
 <?= view('layout/sidebar') ?>
 
-<div class="main-content">
+<div class="main-content pos-page">
 
     <!-- HEADER -->
-    <div class="page-header d-flex justify-content-between align-items-center mb-4">
-
+    <div class="pos-topbar">
         <div>
-            <div class="d-flex align-items-center gap-2 mb-1">
-                <div class="page-icon">
+            <div class="eyebrow">AREA KASIR</div>
+            <div class="d-flex align-items-center gap-3">
+                <div class="pos-title-icon">
                     <i class="bi bi-cart3"></i>
                 </div>
-
                 <div>
-                    <h3 class="fw-bold mb-0">
-                        Transaksi Penjualan
-                    </h3>
-
-                    <p class="text-muted mb-0">
-                        Buat transaksi penjualan baru
-                    </p>
+                    <h3 class="pos-title mb-0">Transaksi Penjualan</h3>
+                    <p class="pos-subtitle mb-0">Buat transaksi baru dengan cepat dan mudah</p>
                 </div>
             </div>
         </div>
 
-        <a href="<?= base_url('penjualan/riwayat') ?>"
-           class="btn btn-outline-primary">
-
-            <i class="bi bi-clock-history me-1"></i>
-            Riwayat Transaksi
-
+        <a href="<?= base_url('penjualan/riwayat') ?>" class="history-btn">
+            <i class="bi bi-clock-history"></i>
+            <span>Riwayat Transaksi</span>
         </a>
-
     </div>
 
-
-    <!-- ALERT ERROR -->
     <?php if (session()->getFlashdata('error')): ?>
-
-        <div class="alert alert-danger alert-dismissible fade show shadow-sm border-0 mb-4">
-
+        <div class="alert alert-danger alert-dismissible fade show border-0 shadow-sm pos-alert">
             <i class="bi bi-exclamation-triangle-fill me-2"></i>
-
-            <?= session()->getFlashdata('error') ?>
-
-            <button
-                type="button"
-                class="btn-close"
-                data-bs-dismiss="alert">
-            </button>
-
+            <?= esc(session()->getFlashdata('error')) ?>
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         </div>
-
     <?php endif; ?>
 
-
-    <form
-        action="<?= base_url('penjualan/simpan') ?>"
-        method="post"
-        id="formPenjualan"
-    >
-
+    <form action="<?= base_url('penjualan/simpan') ?>" method="post" id="formPenjualan">
         <?= csrf_field() ?>
 
+        <div class="pos-layout">
 
-        <div class="row g-4">
+            <!-- KATALOG PRODUK -->
+            <section class="catalog-panel">
+
+                <div class="catalog-toolbar">
+                    <div class="search-wrap">
+                        <i class="bi bi-search"></i>
+                        <input type="text" id="searchBarang" placeholder="Cari barang..." autocomplete="off">
+                    </div>
+
+                    <div class="product-count">
+                        <i class="bi bi-box-seam"></i>
+                        <span id="productCount"><?= count($barang) ?></span> produk
+                    </div>
+                </div>
+
+                <?php
+                    $kategoriList = [];
+                    foreach ($barang as $b) {
+                        if (!empty($b['nama_kategori']) && !in_array($b['nama_kategori'], $kategoriList)) {
+                            $kategoriList[] = $b['nama_kategori'];
+                        }
+                    }
+                ?>
+
+                <div class="category-tabs" id="categoryTabs">
+                    <button type="button" class="category-btn active" data-category="all">
+                        Semua
+                    </button>
+
+                    <?php foreach ($kategoriList as $kategori): ?>
+                        <button
+                            type="button"
+                            class="category-btn"
+                            data-category="<?= esc($kategori, 'attr') ?>"
+                        >
+                            <?= esc($kategori) ?>
+                        </button>
+                    <?php endforeach; ?>
+                </div>
+
+                <div class="product-grid" id="productGrid">
+
+                    <?php foreach ($barang as $b): ?>
+                        <?php
+                            $namaKategori = $b['nama_kategori'] ?? 'Produk';
+                            $stok = (int) $b['stok'];
+                            $stokClass = $stok <= 5 ? 'low' : '';
+                        ?>
+
+                        <div
+                            class="product-card"
+                            data-id="<?= $b['id_barang'] ?>"
+                            data-name="<?= esc(strtolower($b['nama_barang']), 'attr') ?>"
+                            data-category="<?= esc($namaKategori, 'attr') ?>"
+                            data-price="<?= $b['harga_jual'] ?>"
+                            data-stock="<?= $stok ?>"
+                        >
+                            <div class="product-visual">
+                                <div class="product-icon">
+                                    <i class="bi bi-box-seam"></i>
+                                </div>
+
+                                <span class="stock-badge <?= $stokClass ?>">
+                                    Stok <?= $stok ?>
+                                </span>
+                            </div>
+
+                            <div class="product-info">
+                                <div class="product-code">
+                                    <?= esc($b['kode_barang']) ?>
+                                </div>
+
+                                <div class="product-name">
+                                    <?= esc($b['nama_barang']) ?>
+                                </div>
+
+                                <div class="product-bottom">
+                                    <div class="product-price">
+                                        Rp <?= number_format($b['harga_jual'], 0, ',', '.') ?>
+                                    </div>
+
+                                    <div class="product-unit">
+                                        <?= esc($b['satuan'] ?? 'pcs') ?>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <button type="button" class="add-product-btn">
+                                <i class="bi bi-cart-plus"></i>
+                                Tambah
+                            </button>
+                        </div>
+                    <?php endforeach; ?>
+
+                    <div class="no-product" id="noProduct" style="display:none;">
+                        <div class="no-product-icon">
+                            <i class="bi bi-search"></i>
+                        </div>
+                        <strong>Barang tidak ditemukan</strong>
+                        <span>Coba gunakan kata kunci pencarian lain.</span>
+                    </div>
+
+                </div>
+            </section>
 
 
-            <!-- =====================================================
-                 BAGIAN KIRI
-            ====================================================== -->
+            <!-- CHECKOUT -->
+            <aside class="checkout-panel">
 
-            <div class="col-lg-7">
+                <div class="checkout-header">
+                    <div>
+                        <div class="checkout-title">
+                            <i class="bi bi-cart3"></i>
+                            Keranjang
+                        </div>
+                        <small>Transaksi barang</small>
+                    </div>
+
+                    <button type="button" class="clear-cart-btn" id="btnKosongkan">
+                        Kosongkan
+                    </button>
+                </div>
 
 
                 <!-- CUSTOMER -->
-                <div class="card pos-card border-0 shadow-sm mb-4">
+                <div class="checkout-section">
+                    <label class="checkout-label">
+                        <i class="bi bi-person"></i>
+                        Customer
+                    </label>
 
-                    <div class="card-body p-4">
+                    <select name="id_customer" class="form-select checkout-input">
+                        <option value="">Customer Umum</option>
 
-                        <div class="section-heading mb-3">
-
-                            <div class="section-icon customer-icon">
-                                <i class="bi bi-person"></i>
-                            </div>
-
-                            <div>
-                                <h5 class="fw-bold mb-0">
-                                    Customer
-                                </h5>
-
-                                <small class="text-muted">
-                                    Pilih customer transaksi
-                                </small>
-                            </div>
-
-                        </div>
-
-
-                        <label class="form-label fw-semibold">
-                            Customer
-                        </label>
-
-                        <select
-                            name="id_customer"
-                            class="form-select form-select-lg"
-                        >
-
-                            <option value="">
-                                -- Customer Umum --
+                        <?php foreach ($customer as $c): ?>
+                            <option value="<?= $c['id_customer'] ?>">
+                                <?= esc($c['nama_customer']) ?>
+                                <?php if (!empty($c['no_telp'])): ?>
+                                    - <?= esc($c['no_telp']) ?>
+                                <?php endif; ?>
                             </option>
-
-                            <?php foreach ($customer as $c): ?>
-
-                                <option
-                                    value="<?= $c['id_customer'] ?>"
-                                >
-
-                                    <?= esc($c['nama_customer']) ?>
-
-                                    <?php if (!empty($c['no_telp'])): ?>
-                                        - <?= esc($c['no_telp']) ?>
-                                    <?php endif; ?>
-
-                                </option>
-
-                            <?php endforeach; ?>
-
-                        </select>
-
-                        <div class="form-hint mt-2">
-
-                            <i class="bi bi-info-circle me-1"></i>
-
-                            Kosongkan jika pembeli adalah customer umum.
-
-                        </div>
-
-                    </div>
-
+                        <?php endforeach; ?>
+                    </select>
                 </div>
 
 
-                <!-- TAMBAH BARANG -->
-                <div class="card pos-card border-0 shadow-sm mb-4">
-
-                    <div class="card-body p-4">
-
-                        <div class="section-heading mb-4">
-
-                            <div class="section-icon product-icon">
-                                <i class="bi bi-box-seam"></i>
-                            </div>
-
-                            <div>
-                                <h5 class="fw-bold mb-0">
-                                    Tambah Barang
-                                </h5>
-
-                                <small class="text-muted">
-                                    Pilih produk dan tentukan jumlah
-                                </small>
-                            </div>
-
+                <!-- CART -->
+                <div class="cart-area">
+                    <div class="cart-empty" id="emptyCart">
+                        <div class="cart-empty-icon">
+                            <i class="bi bi-cart-x"></i>
                         </div>
+                        <strong>Keranjang masih kosong</strong>
+                        <span>Pilih produk dari katalog untuk mulai menjual.</span>
+                    </div>
+
+                    <div class="cart-items" id="cartItems"></div>
+                </div>
 
 
-                        <div class="row g-3">
+                <!-- SUMMARY -->
+                <div class="summary-area">
+                    <div class="summary-row">
+                        <span>Jumlah item</span>
+                        <strong id="jumlahItem">0 Item</strong>
+                    </div>
+
+                    <div class="summary-row">
+                        <span>Subtotal</span>
+                        <strong id="subtotalText">Rp 0</strong>
+                    </div>
+
+                    <div class="summary-divider"></div>
+
+                    <div class="summary-total">
+                        <span>Total</span>
+                        <strong id="totalText">Rp 0</strong>
+                    </div>
+                </div>
 
 
-                            <!-- BARANG -->
-                            <div class="col-md-8">
+                <!-- PAYMENT -->
+                <div class="payment-area">
 
-                                <label class="form-label fw-semibold">
-                                    Barang
-                                </label>
+                    <label class="checkout-label">
+                        <i class="bi bi-credit-card"></i>
+                        Metode pembayaran
+                    </label>
 
-                                <select
-                                    id="selectBarang"
-                                    class="form-select form-select-lg"
-                                >
+                    <select class="form-select checkout-input" name="metode_pembayaran">
+                        <option value="Tunai">Tunai</option>
+                    </select>
 
-                                    <option value="">
-                                        -- Pilih Barang --
-                                    </option>
+                    <label class="checkout-label mt-3">
+                        <i class="bi bi-cash-stack"></i>
+                        Uang diterima
+                    </label>
 
-                                    <?php foreach ($barang as $b): ?>
-
-                                        <option
-                                            value="<?= $b['id_barang'] ?>"
-                                            data-harga="<?= $b['harga_jual'] ?>"
-                                            data-stok="<?= $b['stok'] ?>"
-                                        >
-
-                                            <?= esc($b['kode_barang']) ?>
-                                            -
-                                            <?= esc($b['nama_barang']) ?>
-                                            | Rp <?= number_format($b['harga_jual'], 0, ',', '.') ?>
-                                            | Stok: <?= $b['stok'] ?>
-
-                                        </option>
-
-                                    <?php endforeach; ?>
-
-                                </select>
-
-                            </div>
-
-
-                            <!-- QTY -->
-                            <div class="col-md-4">
-
-                                <label class="form-label fw-semibold">
-                                    Jumlah
-                                </label>
-
-                                <input
-                                    type="number"
-                                    id="inputQty"
-                                    class="form-control form-control-lg"
-                                    value="1"
-                                    min="1"
-                                >
-
-                            </div>
-
-                        </div>
-
-
-                        <button
-                            type="button"
-                            class="btn btn-primary mt-3"
-                            id="btnTambah"
+                    <div class="money-input">
+                        <span>Rp</span>
+                        <input
+                            type="number"
+                            name="bayar"
+                            id="inputBayar"
+                            min="0"
+                            placeholder="Masukkan nominal tunai"
+                            required
                         >
+                    </div>
 
-                            <i class="bi bi-cart-plus me-1"></i>
+                    <div class="change-row">
+                        <div>
+                            <small>Kembalian</small>
+                            <strong id="kembalianText">Rp 0</strong>
+                        </div>
+                        <div class="change-icon">
+                            <i class="bi bi-wallet2"></i>
+                        </div>
+                    </div>
 
-                            Tambah ke Keranjang
+                    <button
+                        type="submit"
+                        class="confirm-btn"
+                        id="btnSimpan"
+                        disabled
+                    >
+                        <i class="bi bi-check-circle"></i>
+                        Konfirmasi transaksi
+                    </button>
 
-                        </button>
-
+                    <div class="payment-note">
+                        <i class="bi bi-shield-check"></i>
+                        Pastikan barang dan nominal pembayaran sudah benar.
                     </div>
 
                 </div>
 
-
-                <!-- KERANJANG -->
-                <div class="card pos-card border-0 shadow-sm">
-
-                    <div class="card-body p-0">
-
-
-                        <!-- CART HEADER -->
-                        <div class="cart-header p-4">
-
-                            <div class="d-flex justify-content-between align-items-center">
-
-                                <div class="section-heading mb-0">
-
-                                    <div class="section-icon cart-icon">
-                                        <i class="bi bi-cart3"></i>
-                                    </div>
-
-                                    <div>
-                                        <h5 class="fw-bold mb-0">
-                                            Keranjang
-                                        </h5>
-
-                                        <small class="text-muted">
-                                            Daftar barang yang dibeli
-                                        </small>
-                                    </div>
-
-                                </div>
-
-
-                                <span
-                                    class="item-badge"
-                                    id="jumlahItem"
-                                >
-                                    0 Item
-                                </span>
-
-                            </div>
-
-                        </div>
-
-
-                        <!-- CART TABLE -->
-                        <div class="table-responsive">
-
-                            <table class="table cart-table align-middle mb-0">
-
-                                <thead>
-
-                                    <tr>
-
-                                        <th width="55">
-                                            #
-                                        </th>
-
-                                        <th>
-                                            Barang
-                                        </th>
-
-                                        <th>
-                                            Harga
-                                        </th>
-
-                                        <th width="110">
-                                            Qty
-                                        </th>
-
-                                        <th>
-                                            Subtotal
-                                        </th>
-
-                                        <th width="60">
-                                        </th>
-
-                                    </tr>
-
-                                </thead>
-
-
-                                <tbody id="keranjangBody">
-
-                                    <tr id="emptyCart">
-
-                                        <td
-                                            colspan="6"
-                                            class="empty-cart"
-                                        >
-
-                                            <div class="empty-cart-icon">
-                                                <i class="bi bi-cart-x"></i>
-                                            </div>
-
-                                            <div class="fw-semibold mb-1">
-                                                Keranjang masih kosong
-                                            </div>
-
-                                            <small class="text-muted">
-                                                Tambahkan barang untuk memulai transaksi.
-                                            </small>
-
-                                        </td>
-
-                                    </tr>
-
-                                </tbody>
-
-                            </table>
-
-                        </div>
-
-                    </div>
-
-                </div>
-
-            </div>
-
-
-            <!-- =====================================================
-                 BAGIAN KANAN
-            ====================================================== -->
-
-            <div class="col-lg-5">
-
-
-                <div
-                    class="card summary-card border-0 shadow-sm sticky-top"
-                    style="top: 20px;"
-                >
-
-                    <div class="card-body p-4">
-
-
-                        <!-- HEADER -->
-                        <div class="summary-heading mb-4">
-
-                            <div class="section-icon summary-icon">
-                                <i class="bi bi-receipt"></i>
-                            </div>
-
-                            <div>
-                                <h5 class="fw-bold mb-0">
-                                    Ringkasan Transaksi
-                                </h5>
-
-                                <small class="text-muted">
-                                    Detail pembayaran
-                                </small>
-                            </div>
-
-                        </div>
-
-
-                        <!-- TOTAL -->
-                        <div class="total-box mb-4">
-
-                            <div class="total-label">
-                                Total Belanja
-                            </div>
-
-                            <div
-                                class="total-value"
-                                id="totalText"
-                            >
-                                Rp 0
-                            </div>
-
-                        </div>
-
-
-                        <!-- BAYAR -->
-                        <div class="mb-4">
-
-                            <label class="form-label fw-semibold">
-
-                                <i class="bi bi-cash-stack me-1"></i>
-
-                                Uang Bayar
-
-                            </label>
-
-                            <div class="input-group input-group-lg">
-
-                                <span class="input-group-text">
-                                    Rp
-                                </span>
-
-                                <input
-                                    type="number"
-                                    name="bayar"
-                                    id="inputBayar"
-                                    class="form-control"
-                                    min="0"
-                                    placeholder="0"
-                                    required
-                                >
-
-                            </div>
-
-                            <small class="text-muted mt-1 d-block">
-                                Masukkan nominal uang yang diterima.
-                            </small>
-
-                        </div>
-
-
-                        <!-- KEMBALIAN -->
-                        <div class="change-box mb-4">
-
-                            <div class="d-flex justify-content-between align-items-center">
-
-                                <div>
-
-                                    <small class="text-muted d-block">
-                                        Kembalian
-                                    </small>
-
-                                    <strong id="kembalianText">
-                                        Rp 0
-                                    </strong>
-
-                                </div>
-
-                                <div class="change-icon">
-                                    <i class="bi bi-wallet2"></i>
-                                </div>
-
-                            </div>
-
-                        </div>
-
-
-                        <!-- BUTTON SIMPAN -->
-                        <button
-                            type="submit"
-                            class="btn btn-success btn-lg w-100"
-                            id="btnSimpan"
-                            disabled
-                        >
-
-                            <i class="bi bi-check-circle me-1"></i>
-
-                            Simpan Transaksi
-
-                        </button>
-
-
-                        <a
-                            href="<?= base_url('dashboard') ?>"
-                            class="btn btn-light border w-100 mt-2"
-                        >
-
-                            <i class="bi bi-arrow-left me-1"></i>
-
-                            Kembali
-
-                        </a>
-
-
-                        <!-- INFO -->
-                        <div class="transaction-info mt-4">
-
-                            <i class="bi bi-shield-check"></i>
-
-                            <span>
-                                Pastikan jumlah pembayaran sudah benar
-                                sebelum menyimpan transaksi.
-                            </span>
-
-                        </div>
-
-                    </div>
-
-                </div>
-
-            </div>
+            </aside>
 
         </div>
-
     </form>
-
 </div>
 
 
 <style>
+/* =========================================================
+   POS SALES - MODERN UI
+========================================================= */
 
-/* =====================================================
-   GENERAL
-===================================================== */
-
-.pos-card,
-.summary-card {
-    border-radius: 16px;
-    overflow: hidden;
+.pos-page {
+    background: #f8f9fa;
+    min-height: 100vh;
 }
 
-.page-header {
-    min-height: 55px;
+/* HEADER */
+.pos-topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 20px;
+    margin-bottom: 24px;
 }
 
-.page-icon {
+.eyebrow {
+    color: #6c757d;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    margin-bottom: 6px;
+}
+
+.pos-title-icon {
     width: 46px;
     height: 46px;
-
     display: flex;
     align-items: center;
     justify-content: center;
-
+    border-radius: 13px;
     background: #eaf2ff;
     color: #0d6efd;
-
-    border-radius: 12px;
-
-    font-size: 22px;
+    font-size: 21px;
 }
 
-
-/* =====================================================
-   SECTION
-===================================================== */
-
-.section-heading,
-.summary-heading {
-    display: flex;
-    align-items: center;
-    gap: 12px;
+.pos-title {
+    color: #212529;
+    font-size: 25px;
+    font-weight: 700;
 }
 
-.section-icon {
-    width: 42px;
-    height: 42px;
-
-    display: flex;
-    align-items: center;
-    justify-content: center;
-
-    border-radius: 11px;
-
-    font-size: 19px;
-
-    flex-shrink: 0;
-}
-
-.customer-icon {
-    background: #eaf2ff;
-    color: #0d6efd;
-}
-
-.product-icon {
-    background: #eaf8f1;
-    color: #198754;
-}
-
-.cart-icon {
-    background: #fff4e5;
-    color: #fd7e14;
-}
-
-.summary-icon {
-    background: #f0eaff;
-    color: #6f42c1;
-}
-
-
-/* =====================================================
-   FORM
-===================================================== */
-
-.form-select,
-.form-control {
-    border-radius: 10px;
-}
-
-.form-select-lg,
-.form-control-lg {
-    min-height: 48px;
-}
-
-.form-hint {
-    font-size: 12px;
+.pos-subtitle {
     color: #6c757d;
+    font-size: 13px;
+    margin-top: 3px;
 }
 
-
-/* =====================================================
-   CART
-===================================================== */
-
-.cart-header {
-    border-bottom: 1px solid #edf0f2;
+.history-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 11px 16px;
+    border: 1px solid #dfe7e2;
+    border-radius: 11px;
+    background: #fff;
+    color: #344054;
+    text-decoration: none;
+    font-size: 13px;
+    font-weight: 600;
+    transition: .2s;
 }
 
-.item-badge {
-    padding: 7px 12px;
-
-    background: #eaf2ff;
-
+.history-btn:hover {
+    background: #f4f8ff;
     color: #0d6efd;
+    border-color: #cfe2ff;
+}
 
-    border-radius: 50px;
+.pos-alert {
+    border-radius: 12px;
+}
 
+
+/* MAIN GRID */
+.pos-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 390px;
+    gap: 22px;
+    align-items: start;
+}
+
+
+/* CATALOG */
+.catalog-panel {
+    background: #fff;
+    border: 1px solid #e9ecef;
+    border-radius: 18px;
+    padding: 22px;
+    box-shadow: 0 5px 20px rgba(13, 110, 253, .04);
+}
+
+.catalog-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.search-wrap {
+    position: relative;
+    flex: 1;
+}
+
+.search-wrap i {
+    position: absolute;
+    left: 16px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #87958f;
+    font-size: 17px;
+}
+
+.search-wrap input {
+    width: 100%;
+    height: 48px;
+    padding: 0 16px 0 44px;
+    border: 1px solid #dee2e6;
+    border-radius: 12px;
+    outline: none;
+    color: #212529;
+    font-size: 13px;
+    background: #fff;
+}
+
+.search-wrap input:focus {
+    border-color: #86b7fe;
+    box-shadow: 0 0 0 3px rgba(13, 110, 253, .08);
+}
+
+.product-count {
+    height: 48px;
+    padding: 0 15px;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    border: 1px solid #dee2e6;
+    border-radius: 12px;
+    color: #6c757d;
+    background: #fff;
+    white-space: nowrap;
     font-size: 12px;
     font-weight: 600;
 }
 
-.cart-table thead th {
-    background: #f8f9fa;
+.product-count i {
+    color: #0d6efd;
+}
 
+
+/* CATEGORY */
+.category-tabs {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin: 18px 0;
+}
+
+.category-btn {
+    border: 0;
+    background: #f1f3f5;
     color: #6c757d;
-
+    border-radius: 50px;
+    padding: 9px 16px;
     font-size: 12px;
-
-    text-transform: uppercase;
-
-    letter-spacing: .3px;
-
-    padding: 13px 12px;
-
-    border-bottom: 1px solid #e9ecef;
+    font-weight: 600;
+    transition: .2s;
 }
 
-.cart-table tbody td {
-    padding: 14px 12px;
-
-    border-color: #edf0f2;
+.category-btn:hover {
+    background: #eaf2ff;
+    color: #0d6efd;
 }
 
-.cart-table tbody tr:last-child td {
-    border-bottom: none;
+.category-btn.active {
+    background: #0d6efd;
+    color: #fff;
 }
 
 
-/* =====================================================
-   EMPTY CART
-===================================================== */
-
-.empty-cart {
-    text-align: center;
-
-    padding: 50px 20px !important;
+/* PRODUCT GRID */
+.product-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 13px;
 }
 
-.empty-cart-icon {
-    width: 60px;
-    height: 60px;
+.product-card {
+    min-width: 0;
+    padding: 12px;
+    border: 1px solid #e2e6ea;
+    border-radius: 14px;
+    background: #fff;
+    transition: transform .2s, box-shadow .2s, border-color .2s;
+}
 
+.product-card:hover {
+    transform: translateY(-2px);
+    border-color: #cfe2ff;
+    box-shadow: 0 7px 20px rgba(13, 110, 253, .08);
+}
+
+.product-visual {
+    position: relative;
+    height: 112px;
+    border-radius: 11px;
+    background: linear-gradient(135deg, #f8f9fa, #f4f8ff);
     display: flex;
     align-items: center;
     justify-content: center;
+    margin-bottom: 11px;
+}
 
-    margin: 0 auto 12px;
-
-    background: #f1f3f5;
-
-    color: #adb5bd;
-
-    border-radius: 16px;
-
+.product-icon {
+    width: 56px;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 17px;
+    background: #eaf2ff;
+    color: #0d6efd;
     font-size: 26px;
 }
 
-
-/* =====================================================
-   SUMMARY
-===================================================== */
-
-.summary-card {
-    z-index: 1;
-}
-
-.total-box {
-    padding: 20px;
-
-    background: #f5f8ff;
-
-    border: 1px solid #e2eaff;
-
-    border-radius: 14px;
-}
-
-.total-label {
-    color: #6c757d;
-
-    font-size: 13px;
-
-    margin-bottom: 4px;
-}
-
-.total-value {
+.stock-badge {
+    position: absolute;
+    right: 8px;
+    bottom: 8px;
+    padding: 5px 8px;
+    border-radius: 50px;
+    background: #e7f1ff;
     color: #0d6efd;
-
-    font-size: 30px;
-
+    font-size: 10px;
     font-weight: 700;
 }
 
-
-/* =====================================================
-   CHANGE
-===================================================== */
-
-.change-box {
-    padding: 17px 18px;
-
-    background: #f1fdf6;
-
-    border: 1px solid #d6f1e0;
-
-    border-radius: 13px;
+.stock-badge.low {
+    background: #fff3cd;
+    color: #856404;
 }
 
-#kembalianText {
-    color: #198754;
-
-    font-size: 23px;
+.product-code {
+    color: #adb5bd;
+    font-size: 9px;
+    font-weight: 600;
+    margin-bottom: 3px;
 }
 
-.change-icon {
-    width: 40px;
-    height: 40px;
+.product-name {
+    color: #263c35;
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1.45;
+    min-height: 35px;
+}
 
+.product-bottom {
+    display: flex;
+    justify-content: space-between;
+    align-items: end;
+    gap: 8px;
+    margin-top: 5px;
+}
+
+.product-price {
+    color: #0d6efd;
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.product-unit {
+    color: #adb5bd;
+    font-size: 9px;
+}
+
+.add-product-btn {
+    width: 100%;
+    border: 0;
+    margin-top: 11px;
+    padding: 9px 8px;
+    border-radius: 9px;
+    background: #0d6efd;
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    transition: .2s;
+}
+
+.add-product-btn:hover {
+    background: #0b5ed7;
+}
+
+.add-product-btn i {
+    margin-right: 4px;
+}
+
+.product-card.out-of-stock {
+    opacity: .55;
+}
+
+.product-card.out-of-stock .add-product-btn {
+    background: #adb8b3;
+    cursor: not-allowed;
+}
+
+.no-product {
+    grid-column: 1 / -1;
+    padding: 55px 20px;
+    text-align: center;
+    color: #74837d;
+}
+
+.no-product-icon {
+    width: 58px;
+    height: 58px;
     display: flex;
     align-items: center;
     justify-content: center;
+    margin: 0 auto 12px;
+    border-radius: 16px;
+    background: #f8f9fa;
+    color: #adb5bd;
+    font-size: 22px;
+}
 
-    background: #198754;
+.no-product strong,
+.no-product span {
+    display: block;
+}
 
-    color: white;
+.no-product strong {
+    color: #495057;
+    font-size: 14px;
+    margin-bottom: 3px;
+}
 
-    border-radius: 11px;
-
-    font-size: 18px;
+.no-product span {
+    font-size: 12px;
 }
 
 
-/* =====================================================
-   INFO
-===================================================== */
+/* CHECKOUT */
+.checkout-panel {
+    position: sticky;
+    top: 20px;
+    background: #fff;
+    border: 1px solid #e4ebe7;
+    border-radius: 18px;
+    box-shadow: 0 7px 25px rgba(35, 62, 53, .06);
+    overflow: hidden;
+}
 
-.transaction-info {
+.checkout-header {
+    padding: 20px 20px 17px;
     display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid #edf1ef;
+}
 
-    gap: 8px;
+.checkout-title {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    color: #212529;
+    font-size: 18px;
+    font-weight: 700;
+}
 
-    padding: 12px 14px;
+.checkout-title i {
+    color: #0d6efd;
+}
 
-    background: #f8f9fa;
-
-    border-radius: 10px;
-
+.checkout-header small {
     color: #6c757d;
-
     font-size: 11px;
+    margin-left: 28px;
+}
 
+.clear-cart-btn {
+    border: 0;
+    background: transparent;
+    color: #df6256;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 7px;
+}
+
+.clear-cart-btn:hover {
+    color: #bb3e32;
+}
+
+.checkout-section {
+    padding: 16px 20px 12px;
+}
+
+.checkout-label {
+    display: block;
+    color: #344054;
+    font-size: 11px;
+    font-weight: 700;
+    margin-bottom: 7px;
+}
+
+.checkout-label i {
+    color: #0d6efd;
+    margin-right: 4px;
+}
+
+.checkout-input {
+    min-height: 44px;
+    border-color: #dee2e6;
+    border-radius: 10px;
+    font-size: 12px;
+    color: #343a40;
+    box-shadow: none !important;
+}
+
+
+/* CART AREA */
+.cart-area {
+    padding: 0 20px;
+}
+
+.cart-empty {
+    min-height: 180px;
+    padding: 25px 15px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    border: 1px dashed #d8e1dd;
+    border-radius: 14px;
+    color: #6c757d;
+}
+
+.cart-empty-icon {
+    width: 55px;
+    height: 55px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: #f8f9fa;
+    color: #adb5bd;
+    font-size: 24px;
+    margin-bottom: 11px;
+}
+
+.cart-empty strong {
+    color: #495057;
+    font-size: 13px;
+    margin-bottom: 4px;
+}
+
+.cart-empty span {
+    font-size: 11px;
+}
+
+.cart-items {
+    max-height: 290px;
+    overflow-y: auto;
+}
+
+.cart-item {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 10px;
+    padding: 12px 0;
+    border-bottom: 1px solid #edf1ef;
+}
+
+.cart-item:last-child {
+    border-bottom: 0;
+}
+
+.cart-item-name {
+    color: #343a40;
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1.35;
+}
+
+.cart-item-price {
+    color: #6c757d;
+    font-size: 10px;
+    margin-top: 3px;
+}
+
+.cart-item-total {
+    color: #0d6efd;
+    font-size: 12px;
+    font-weight: 700;
+    text-align: right;
+}
+
+.cart-item-controls {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    margin-top: 7px;
+}
+
+.qty-btn {
+    width: 25px;
+    height: 25px;
+    padding: 0;
+    border: 1px solid #dce5e0;
+    border-radius: 7px;
+    background: #fff;
+    color: #6c757d;
+    font-size: 12px;
+}
+
+.qty-value {
+    min-width: 28px;
+    text-align: center;
+    color: #343a40;
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.remove-btn {
+    width: 25px;
+    height: 25px;
+    padding: 0;
+    border: 0;
+    border-radius: 7px;
+    background: #fff1ef;
+    color: #d85b50;
+    font-size: 11px;
+    margin-left: 3px;
+}
+
+
+/* SUMMARY */
+.summary-area {
+    margin: 13px 20px 0;
+    padding: 15px 0;
+    border-top: 1px solid #e9efec;
+}
+
+.summary-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 0;
+    color: #6c757d;
+    font-size: 11px;
+}
+
+.summary-row strong {
+    color: #495057;
+    font-size: 11px;
+}
+
+.summary-divider {
+    border-top: 1px dashed #dce4e0;
+    margin: 8px 0;
+}
+
+.summary-total {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 2px;
+}
+
+.summary-total span {
+    color: #212529;
+    font-size: 15px;
+    font-weight: 700;
+}
+
+.summary-total strong {
+    color: #0d6efd;
+    font-size: 22px;
+    font-weight: 800;
+}
+
+
+/* PAYMENT */
+.payment-area {
+    padding: 0 20px 20px;
+}
+
+.money-input {
+    display: flex;
+    align-items: center;
+    height: 45px;
+    border: 1px solid #dee2e6;
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.money-input span {
+    padding-left: 13px;
+    color: #6d7c76;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.money-input input {
+    width: 100%;
+    height: 100%;
+    border: 0;
+    outline: none;
+    padding: 0 12px 0 7px;
+    color: #343a40;
+    font-size: 12px;
+}
+
+.money-input:focus-within {
+    border-color: #86b7fe;
+    box-shadow: 0 0 0 3px rgba(13, 110, 253, .08);
+}
+
+.change-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 13px 14px;
+    margin-top: 12px;
+    border: 1px solid #dceee5;
+    border-radius: 11px;
+    background: #f8fbff;
+}
+
+.change-row small {
+    display: block;
+    color: #6c757d;
+    font-size: 10px;
+    margin-bottom: 2px;
+}
+
+.change-row strong {
+    display: block;
+    color: #0d6efd;
+    font-size: 17px;
+}
+
+.change-icon {
+    width: 35px;
+    height: 35px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 10px;
+    background: #0d6efd;
+    color: #fff;
+}
+
+.confirm-btn {
+    width: 100%;
+    border: 0;
+    margin-top: 13px;
+    min-height: 47px;
+    border-radius: 11px;
+    background: #0d6efd;
+    color: #fff;
+    font-size: 12px;
+    font-weight: 700;
+    transition: .2s;
+}
+
+.confirm-btn:not(:disabled):hover {
+    background: #0b5ed7;
+    transform: translateY(-1px);
+}
+
+.confirm-btn:disabled {
+    background: #b8c5c0;
+    cursor: not-allowed;
+}
+
+.confirm-btn i {
+    margin-right: 5px;
+}
+
+.payment-note {
+    display: flex;
+    align-items: flex-start;
+    gap: 7px;
+    margin-top: 11px;
+    padding: 9px 10px;
+    border-radius: 9px;
+    background: #f6f8f7;
+    color: #6c757d;
+    font-size: 9px;
     line-height: 1.5;
 }
 
-.transaction-info i {
-    font-size: 15px;
-    color: #198754;
+.payment-note i {
+    color: #0d6efd;
+    font-size: 13px;
 }
 
 
-/* =====================================================
-   BUTTON
-===================================================== */
+/* RESPONSIVE */
+@media (max-width: 1200px) {
+    .pos-layout {
+        grid-template-columns: minmax(0, 1fr) 350px;
+    }
 
-#btnTambah {
-    border-radius: 10px;
-
-    padding: 10px 16px;
+    .product-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
 }
-
-#btnSimpan {
-    border-radius: 11px;
-
-    padding: 12px;
-}
-
-
-/* =====================================================
-   RESPONSIVE
-===================================================== */
 
 @media (max-width: 991px) {
-
-    .summary-card {
-        position: static !important;
+    .pos-layout {
+        grid-template-columns: 1fr;
     }
 
-}
+    .checkout-panel {
+        position: static;
+    }
 
+    .product-grid {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+}
 
 @media (max-width: 768px) {
-
-    .main-content {
-        padding: 20px !important;
+    .pos-page {
+        padding-bottom: 25px;
     }
 
-    .page-header {
-        align-items: flex-start !important;
-
+    .pos-topbar {
         flex-direction: column;
-
-        gap: 15px;
+        align-items: flex-start;
     }
 
-    .page-header > a {
+    .history-btn {
         width: 100%;
+        justify-content: center;
     }
 
-    .cart-table {
-        min-width: 700px;
+    .catalog-panel {
+        padding: 15px;
     }
 
-    .total-value {
-        font-size: 25px;
+    .catalog-toolbar {
+        flex-direction: column;
+        align-items: stretch;
     }
 
+    .product-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
 }
 
+@media (max-width: 480px) {
+    .product-grid {
+        grid-template-columns: 1fr;
+    }
+}
 </style>
 
 
 <script>
+/* =========================================================
+   DATA
+========================================================= */
 
-/* =====================================================
-   DATA KERANJANG
-===================================================== */
+const produkData = <?= json_encode(
+    array_values($barang),
+    JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP
+) ?>;
 
 let keranjang = [];
 
 
-/* =====================================================
-   FORMAT RUPIAH
-===================================================== */
+/* =========================================================
+   HELPER
+========================================================= */
 
-function formatRupiah(angka)
-{
+function formatRupiah(angka) {
     return 'Rp ' + Number(angka).toLocaleString('id-ID');
 }
 
-
-/* =====================================================
-   TAMBAH BARANG
-===================================================== */
-
-document
-    .getElementById('btnTambah')
-    .addEventListener('click', function()
-    {
-
-        const select =
-            document.getElementById('selectBarang');
-
-        const idBarang =
-            select.value;
-
-        const qty =
-            parseInt(
-                document.getElementById('inputQty').value
-            );
-
-
-        if (!idBarang)
-        {
-            alert('Silakan pilih barang terlebih dahulu.');
-            return;
-        }
-
-
-        if (!qty || qty <= 0)
-        {
-            alert('Jumlah barang harus lebih dari 0.');
-            return;
-        }
-
-
-        const option =
-            select.options[select.selectedIndex];
-
-
-        const namaBarang =
-            option.text.split('|')[0].trim();
-
-
-        const harga =
-            parseFloat(option.dataset.harga);
-
-
-        const stok =
-            parseInt(option.dataset.stok);
-
-
-        const existing =
-            keranjang.find(
-                item => item.id_barang == idBarang
-            );
-
-
-        if (existing)
-        {
-
-            if (existing.qty + qty > stok)
-            {
-                alert(
-                    'Jumlah melebihi stok yang tersedia.\n' +
-                    'Stok tersedia: ' + stok
-                );
-
-                return;
-            }
-
-
-            existing.qty += qty;
-
-        }
-        else
-        {
-
-            if (qty > stok)
-            {
-                alert(
-                    'Jumlah melebihi stok yang tersedia.\n' +
-                    'Stok tersedia: ' + stok
-                );
-
-                return;
-            }
-
-
-            keranjang.push({
-
-                id_barang: idBarang,
-
-                nama_barang: namaBarang,
-
-                harga: harga,
-
-                qty: qty,
-
-                stok: stok
-
-            });
-
-        }
-
-
-        renderKeranjang();
-
-
-        select.value = '';
-
-        document.getElementById('inputQty').value = 1;
-
-    });
-
-
-/* =====================================================
-   RENDER KERANJANG
-===================================================== */
-
-function renderKeranjang()
-{
-
-    const body =
-        document.getElementById('keranjangBody');
-
-
-    body.innerHTML = '';
-
-
-    if (keranjang.length === 0)
-    {
-
-        body.innerHTML = `
-
-            <tr>
-
-                <td
-                    colspan="6"
-                    class="empty-cart"
-                >
-
-                    <div class="empty-cart-icon">
-                        <i class="bi bi-cart-x"></i>
-                    </div>
-
-                    <div class="fw-semibold mb-1">
-                        Keranjang masih kosong
-                    </div>
-
-                    <small class="text-muted">
-                        Tambahkan barang untuk memulai transaksi.
-                    </small>
-
-                </td>
-
-            </tr>
-
-        `;
-
-    }
-
-
-    let total = 0;
-
-
-    keranjang.forEach(
-        (item, index) =>
-        {
-
-            const subtotal =
-                item.harga * item.qty;
-
-
-            total += subtotal;
-
-
-            body.innerHTML += `
-
-                <tr>
-
-                    <td class="text-muted">
-                        ${index + 1}
-                    </td>
-
-
-                    <td>
-
-                        <div class="fw-semibold">
-                            ${item.nama_barang}
-                        </div>
-
-                    </td>
-
-
-                    <td>
-                        ${formatRupiah(item.harga)}
-                    </td>
-
-
-                    <td>
-
-                        <input
-                            type="number"
-                            class="form-control form-control-sm"
-                            value="${item.qty}"
-                            min="1"
-                            max="${item.stok}"
-                            onchange="ubahQty(${index}, this.value)"
-                        >
-
-                    </td>
-
-
-                    <td class="fw-bold">
-                        ${formatRupiah(subtotal)}
-                    </td>
-
-
-                    <td>
-
-                        <button
-                            type="button"
-                            class="btn btn-sm btn-outline-danger"
-                            onclick="hapusItem(${index})"
-                            title="Hapus barang"
-                        >
-
-                            <i class="bi bi-trash"></i>
-
-                        </button>
-
-                    </td>
-
-                </tr>
-
-
-                <input
-                    type="hidden"
-                    name="id_barang[]"
-                    value="${item.id_barang}"
-                >
-
-                <input
-                    type="hidden"
-                    name="qty[]"
-                    value="${item.qty}"
-                >
-
-            `;
-
-        }
-    );
-
-
-    document.getElementById('totalText')
-        .innerText =
-        formatRupiah(total);
-
-
-    document.getElementById('jumlahItem')
-        .innerText =
-        keranjang.length + ' Item';
-
-
-    hitungKembalian();
-
+function getProduct(id) {
+    return produkData.find(item => String(item.id_barang) === String(id));
 }
 
 
-/* =====================================================
-   UBAH QTY
-===================================================== */
+/* =========================================================
+   TAMBAH PRODUK
+========================================================= */
 
-function ubahQty(index, value)
-{
+document.querySelectorAll('.add-product-btn').forEach(button => {
 
-    const qty =
-        parseInt(value);
+    button.addEventListener('click', function () {
 
+        const card = this.closest('.product-card');
 
-    if (
-        !qty ||
-        qty <= 0 ||
-        qty > keranjang[index].stok
-    )
-    {
+        const idBarang = card.dataset.id;
+        const namaBarang = card.querySelector('.product-name').innerText;
+        const harga = parseFloat(card.dataset.price);
+        const stok = parseInt(card.dataset.stock);
 
-        alert(
-            'Jumlah tidak valid. Stok tersedia: ' +
-            keranjang[index].stok
+        if (!idBarang || stok <= 0) {
+            alert('Barang sedang tidak tersedia.');
+            return;
+        }
+
+        const existing = keranjang.find(
+            item => String(item.id_barang) === String(idBarang)
         );
 
+        if (existing) {
+
+            if (existing.qty + 1 > stok) {
+                alert(
+                    'Jumlah melebihi stok yang tersedia.\n' +
+                    'Stok tersedia: ' + stok
+                );
+                return;
+            }
+
+            existing.qty++;
+
+        } else {
+
+            keranjang.push({
+                id_barang: idBarang,
+                nama_barang: namaBarang,
+                harga: harga,
+                qty: 1,
+                stok: stok
+            });
+        }
+
         renderKeranjang();
+    });
+});
 
-        return;
 
+/* =========================================================
+   RENDER KERANJANG
+========================================================= */
+
+function renderKeranjang() {
+
+    const container = document.getElementById('cartItems');
+    const empty = document.getElementById('emptyCart');
+
+    container.innerHTML = '';
+
+    if (keranjang.length === 0) {
+
+        empty.style.display = 'flex';
+
+    } else {
+
+        empty.style.display = 'none';
+
+        keranjang.forEach((item, index) => {
+
+            const subtotal = item.harga * item.qty;
+
+            const row = document.createElement('div');
+            row.className = 'cart-item';
+
+            const left = document.createElement('div');
+
+            const name = document.createElement('div');
+            name.className = 'cart-item-name';
+            name.textContent = item.nama_barang;
+
+            const price = document.createElement('div');
+            price.className = 'cart-item-price';
+            price.textContent = formatRupiah(item.harga) + ' / item';
+
+            const controls = document.createElement('div');
+            controls.className = 'cart-item-controls';
+
+            const minus = document.createElement('button');
+            minus.type = 'button';
+            minus.className = 'qty-btn';
+            minus.innerHTML = '<i class="bi bi-dash"></i>';
+            minus.onclick = () => ubahQty(index, item.qty - 1);
+
+            const qty = document.createElement('span');
+            qty.className = 'qty-value';
+            qty.textContent = item.qty;
+
+            const plus = document.createElement('button');
+            plus.type = 'button';
+            plus.className = 'qty-btn';
+            plus.innerHTML = '<i class="bi bi-plus"></i>';
+            plus.onclick = () => ubahQty(index, item.qty + 1);
+
+            const remove = document.createElement('button');
+            remove.type = 'button';
+            remove.className = 'remove-btn';
+            remove.innerHTML = '<i class="bi bi-trash3"></i>';
+            remove.title = 'Hapus barang';
+            remove.onclick = () => hapusItem(index);
+
+            controls.append(minus, qty, plus, remove);
+            left.append(name, price, controls);
+
+            const right = document.createElement('div');
+
+            const total = document.createElement('div');
+            total.className = 'cart-item-total';
+            total.textContent = formatRupiah(subtotal);
+
+            right.appendChild(total);
+
+            row.append(left, right);
+            container.appendChild(row);
+
+            const hiddenId = document.createElement('input');
+            hiddenId.type = 'hidden';
+            hiddenId.name = 'id_barang[]';
+            hiddenId.value = item.id_barang;
+
+            const hiddenQty = document.createElement('input');
+            hiddenQty.type = 'hidden';
+            hiddenQty.name = 'qty[]';
+            hiddenQty.value = item.qty;
+
+            container.append(hiddenId, hiddenQty);
+        });
     }
 
+    let total = 0;
+    let totalQty = 0;
+
+    keranjang.forEach(item => {
+        total += item.harga * item.qty;
+        totalQty += item.qty;
+    });
+
+    document.getElementById('subtotalText').innerText = formatRupiah(total);
+    document.getElementById('totalText').innerText = formatRupiah(total);
+    document.getElementById('jumlahItem').innerText =
+        totalQty + ' Item';
+
+    hitungKembalian();
+}
+
+
+/* =========================================================
+   UBAH QTY
+========================================================= */
+
+function ubahQty(index, value) {
+
+    const qty = parseInt(value);
+
+    if (!qty || qty <= 0) {
+        hapusItem(index);
+        return;
+    }
+
+    if (qty > keranjang[index].stok) {
+        alert(
+            'Jumlah melebihi stok yang tersedia.\n' +
+            'Stok tersedia: ' + keranjang[index].stok
+        );
+        return;
+    }
 
     keranjang[index].qty = qty;
-
     renderKeranjang();
-
 }
 
 
-/* =====================================================
+/* =========================================================
    HAPUS ITEM
-===================================================== */
+========================================================= */
 
-function hapusItem(index)
-{
+function hapusItem(index) {
+    keranjang.splice(index, 1);
+    renderKeranjang();
+}
 
-    if (
-        confirm(
-            'Yakin ingin menghapus barang dari keranjang?'
-        )
-    )
-    {
 
-        keranjang.splice(index, 1);
+/* =========================================================
+   KOSONGKAN KERANJANG
+========================================================= */
 
-        renderKeranjang();
+document.getElementById('btnKosongkan').addEventListener('click', function () {
 
+    if (keranjang.length === 0) {
+        return;
     }
 
-}
+    if (confirm('Yakin ingin mengosongkan keranjang?')) {
+        keranjang = [];
+        renderKeranjang();
+    }
+});
 
 
-/* =====================================================
+/* =========================================================
    HITUNG KEMBALIAN
-===================================================== */
+========================================================= */
 
-document
-    .getElementById('inputBayar')
-    .addEventListener(
-        'input',
-        hitungKembalian
-    );
+document.getElementById('inputBayar').addEventListener(
+    'input',
+    hitungKembalian
+);
 
-
-function hitungKembalian()
-{
+function hitungKembalian() {
 
     let total = 0;
 
-
-    keranjang.forEach(
-        item =>
-        {
-            total +=
-                item.harga * item.qty;
-        }
-    );
-
+    keranjang.forEach(item => {
+        total += item.harga * item.qty;
+    });
 
     const bayar =
-        parseFloat(
-            document.getElementById('inputBayar').value
-        ) || 0;
+        parseFloat(document.getElementById('inputBayar').value) || 0;
 
+    const kembalian = bayar - total;
 
-    const kembalian =
-        bayar - total;
+    const kembalianText =
+        document.getElementById('kembalianText');
 
+    if (kembalian >= 0) {
 
-    if (kembalian >= 0)
-    {
-
-        document.getElementById('kembalianText')
-            .innerText =
+        kembalianText.innerText =
             formatRupiah(kembalian);
 
-    }
-    else
-    {
+    } else {
 
-        document.getElementById('kembalianText')
-            .innerText =
-            'Kurang ' +
-            formatRupiah(Math.abs(kembalian));
-
+        kembalianText.innerText =
+            'Kurang ' + formatRupiah(Math.abs(kembalian));
     }
 
-
-    document.getElementById('btnSimpan')
-        .disabled =
-        keranjang.length === 0 ||
-        bayar < total;
-
+    document.getElementById('btnSimpan').disabled =
+        keranjang.length === 0 || bayar < total;
 }
 
 
-/* =====================================================
-   VALIDASI SUBMIT
-===================================================== */
+/* =========================================================
+   SEARCH PRODUK
+========================================================= */
 
-document
-    .getElementById('formPenjualan')
-    .addEventListener(
-        'submit',
-        function(e)
-        {
+const searchInput = document.getElementById('searchBarang');
+const productCards = document.querySelectorAll('.product-card');
+const noProduct = document.getElementById('noProduct');
+const productCount = document.getElementById('productCount');
 
-            if (keranjang.length === 0)
-            {
+let activeCategory = 'all';
 
-                e.preventDefault();
+function filterProducts() {
 
-                alert(
-                    'Keranjang masih kosong.'
-                );
+    const keyword = searchInput.value.toLowerCase().trim();
+    let visible = 0;
 
-                return;
+    productCards.forEach(card => {
 
-            }
+        const name = card.dataset.name || '';
+        const category = card.dataset.category || '';
 
+        const matchName = name.includes(keyword);
+        const matchCategory =
+            activeCategory === 'all' ||
+            category === activeCategory;
 
-            let total = 0;
-
-
-            keranjang.forEach(
-                item =>
-                {
-                    total +=
-                        item.harga * item.qty;
-                }
-            );
-
-
-            const bayar =
-                parseFloat(
-                    document.getElementById('inputBayar').value
-                ) || 0;
-
-
-            if (bayar < total)
-            {
-
-                e.preventDefault();
-
-                alert(
-                    'Uang pembayaran kurang.'
-                );
-
-                return;
-
-            }
-
+        if (matchName && matchCategory) {
+            card.style.display = '';
+            visible++;
+        } else {
+            card.style.display = 'none';
         }
-    );
+    });
 
+    productCount.innerText = visible;
+    noProduct.style.display = visible === 0 ? 'block' : 'none';
+}
+
+searchInput.addEventListener('input', filterProducts);
+
+
+/* =========================================================
+   FILTER KATEGORI
+========================================================= */
+
+document.querySelectorAll('.category-btn').forEach(button => {
+
+    button.addEventListener('click', function () {
+
+        document.querySelectorAll('.category-btn').forEach(btn => {
+            btn.classList.remove('active');
+        });
+
+        this.classList.add('active');
+        activeCategory = this.dataset.category;
+
+        filterProducts();
+    });
+});
+
+
+/* =========================================================
+   VALIDASI SUBMIT
+========================================================= */
+
+document.getElementById('formPenjualan').addEventListener(
+    'submit',
+    function (e) {
+
+        if (keranjang.length === 0) {
+
+            e.preventDefault();
+            alert('Keranjang masih kosong.');
+            return;
+        }
+
+        let total = 0;
+
+        keranjang.forEach(item => {
+            total += item.harga * item.qty;
+        });
+
+        const bayar =
+            parseFloat(document.getElementById('inputBayar').value) || 0;
+
+        if (bayar < total) {
+
+            e.preventDefault();
+            alert('Uang pembayaran kurang.');
+            return;
+        }
+    }
+);
+
+
+/* Initial state */
+renderKeranjang();
 </script>
 
 <?= view('layout/footer') ?>
