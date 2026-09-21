@@ -233,6 +233,10 @@
                                 Total
                             </th>
 
+                            <th>
+                                Pembayaran
+                            </th>
+
                             <th class="text-center">
                                 Aksi
                             </th>
@@ -391,6 +395,26 @@
                                     </td>
 
 
+                                    <!-- PAYMENT -->
+                                    <td>
+                                        <?php
+                                            $paymentStatus = $row['payment_status'] ?? 'PAID';
+                                            $statusClass = match ($paymentStatus) {
+                                                'PAID' => 'text-bg-success',
+                                                'PENDING' => 'text-bg-warning',
+                                                'EXPIRED', 'FAILED' => 'text-bg-danger',
+                                                'CANCELLED' => 'text-bg-secondary',
+                                                default => 'text-bg-light',
+                                            };
+                                        ?>
+                                        <div class="fw-semibold small mb-1"><?= esc($row['metode_pembayaran'] ?? 'Tunai') ?></div>
+                                        <span class="badge <?= $statusClass ?>"><?= esc($paymentStatus) ?></span>
+                                        <?php if (!empty($row['payment_reference'])): ?>
+                                            <div class="small text-muted font-monospace mt-1"><?= esc($row['payment_reference']) ?></div>
+                                        <?php endif; ?>
+                                    </td>
+
+
                                     <!-- ACTION -->
                                     <td class="text-center">
 
@@ -422,7 +446,7 @@
                             <tr>
 
                                 <td
-                                    colspan="7"
+                                    colspan="8"
                                     class="text-center py-5"
                                 >
 
@@ -488,6 +512,70 @@
 
         </div>
 
+    </div>
+
+    <!-- PAYMENT ATTEMPTS -->
+    <div class="card border-0 shadow-sm mt-4">
+        <div class="card-header bg-white border-0 p-4 pb-2">
+            <h5 class="fw-bold mb-1"><i class="bi bi-credit-card-2-front me-2 text-primary"></i>Aktivitas Pembayaran Demo</h5>
+            <small class="text-muted">Menampilkan payment attempt terbaru, termasuk yang pending, expired, gagal, atau dibatalkan.</small>
+        </div>
+        <div class="card-body p-4 pt-3">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Waktu</th>
+                            <th>Metode</th>
+                            <th>Reference</th>
+                            <th>Customer</th>
+                            <th class="text-end">Nominal</th>
+                            <th>Status</th>
+                            <th>Selesai</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    <?php if (!empty($paymentAttempts)): ?>
+                        <?php foreach ($paymentAttempts as $paymentRow): ?>
+                            <?php
+                                $attemptStatus = $paymentRow['status'] ?? 'UNKNOWN';
+                                $attemptClass = match ($attemptStatus) {
+                                    'PAID' => 'text-bg-success',
+                                    'PENDING' => 'text-bg-warning',
+                                    'EXPIRED', 'FAILED' => 'text-bg-danger',
+                                    'CANCELLED' => 'text-bg-secondary',
+                                    default => 'text-bg-light',
+                                };
+                                $finishedAt = $paymentRow['paid_at'] ?: ($paymentRow['cancelled_at'] ?? null);
+                            ?>
+                            <tr>
+                                <td>
+                                    <div class="fw-semibold"><?= date('d/m/Y', strtotime($paymentRow['created_at'])) ?></div>
+                                    <small class="text-muted"><?= date('H:i:s', strtotime($paymentRow['created_at'])) ?></small>
+                                </td>
+                                <td><span class="badge bg-light text-dark border"><?= esc($paymentRow['method']) ?></span></td>
+                                <td class="font-monospace small"><?= esc($paymentRow['payment_reference'] ?: '-') ?></td>
+                                <td><?= esc($paymentRow['nama_customer'] ?: 'Customer Umum') ?></td>
+                                <td class="text-end fw-semibold">Rp <?= number_format((float)$paymentRow['amount'], 0, ',', '.') ?></td>
+                                <td><span class="badge <?= $attemptClass ?>"><?= esc($attemptStatus) ?></span></td>
+                                <td>
+                                    <?php if ($finishedAt): ?>
+                                        <small><?= date('d/m/Y H:i:s', strtotime($finishedAt)) ?></small>
+                                    <?php elseif ($attemptStatus === 'EXPIRED'): ?>
+                                        <small class="text-muted">Expired <?= date('H:i:s', strtotime($paymentRow['expires_at'])) ?></small>
+                                    <?php else: ?>
+                                        <small class="text-muted">-</small>
+                                    <?php endif; ?>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                    <?php else: ?>
+                        <tr><td colspan="7" class="text-center py-4 text-muted">Belum ada payment demo.</td></tr>
+                    <?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </div>
 
 </div>

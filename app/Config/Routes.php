@@ -9,6 +9,12 @@ $routes->get('/login', 'Auth::index');
 $routes->post('/login/process', 'Auth::login');
 $routes->post('/logout', 'Auth::logout');
 
+// Phase 7: halaman scan publik. GET hanya menampilkan halaman; perubahan status dilakukan via POST + CSRF.
+$routes->get('/payment/demo/(:segment)', 'Penjualan::demoPayment/$1');
+$routes->post('/payment/demo/(:segment)/confirm', 'Penjualan::confirmDemoPayment/$1');
+$routes->get('/demo-bank/pay/(:segment)', 'Penjualan::demoBankTransfer/$1');
+$routes->post('/demo-bank/pay/(:segment)/confirm', 'Penjualan::confirmDemoTransfer/$1');
+
 $routes->group('', ['filter' => 'auth'], function ($routes) {
     $routes->get('/dashboard', 'Dashboard::index');
 
@@ -16,6 +22,11 @@ $routes->group('', ['filter' => 'auth'], function ($routes) {
     $routes->group('', ['filter' => 'role:admin,kasir'], function ($routes) {
         $routes->get('/penjualan', 'Penjualan::index');
         $routes->post('/penjualan/simpan', 'Penjualan::simpan');
+        $routes->post('/penjualan/qris-demo/prepare', 'Penjualan::prepareDemoQris');
+        $routes->get('/penjualan/qris-demo/status/(:segment)', 'Penjualan::demoQrisStatus/$1');
+        $routes->post('/penjualan/transfer-demo/prepare', 'Penjualan::prepareDemoTransfer');
+        $routes->get('/penjualan/transfer-demo/status/(:segment)', 'Penjualan::demoTransferStatus/$1');
+        $routes->post('/penjualan/payment-demo/cancel/(:segment)', 'Penjualan::cancelDemoPayment/$1');
         $routes->get('/penjualan/riwayat', 'Penjualan::riwayat');
         $routes->get('/penjualan/sukses/(:num)', 'Penjualan::sukses/$1');
     });

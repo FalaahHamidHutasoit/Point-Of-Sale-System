@@ -39,6 +39,7 @@ DROP TABLE IF EXISTS `stock_opname`;
 DROP TABLE IF EXISTS `mutasi_stok`;
 DROP TABLE IF EXISTS `detail_pembelian`;
 DROP TABLE IF EXISTS `pembelian`;
+DROP TABLE IF EXISTS `demo_payments`;
 DROP TABLE IF EXISTS `detail_penjualan`;
 DROP TABLE IF EXISTS `penjualan`;
 DROP TABLE IF EXISTS `barang`;
@@ -222,6 +223,36 @@ CREATE TABLE `mutasi_stok` (
 -- ----------------------------------------------------------------------------
 -- Phase 3 - audit trail / accountability
 -- ----------------------------------------------------------------------------
+-- KAMELA Phase 7 - Dynamic QR Payment Simulation
+-- Run ONCE on an existing KAMELA database.
+CREATE TABLE IF NOT EXISTS `demo_payments` (
+  `id_demo_payment` BIGINT NOT NULL AUTO_INCREMENT,
+  `token` CHAR(64) NOT NULL,
+  `method` ENUM('QRIS','TRANSFER') NOT NULL DEFAULT 'QRIS',
+  `payment_reference` VARCHAR(32) DEFAULT NULL,
+  `id_user` INT NOT NULL,
+  `id_customer` INT DEFAULT NULL,
+  `amount` DECIMAL(15,2) NOT NULL,
+  `payload` LONGTEXT NOT NULL,
+  `status` ENUM('PENDING','PAID','EXPIRED','FAILED','CANCELLED') NOT NULL DEFAULT 'PENDING',
+  `expires_at` DATETIME NOT NULL,
+  `paid_at` DATETIME DEFAULT NULL,
+  `cancelled_at` DATETIME DEFAULT NULL,
+  `id_penjualan` INT DEFAULT NULL,
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id_demo_payment`),
+  UNIQUE KEY `uk_demo_payment_token` (`token`),
+  UNIQUE KEY `uk_demo_payment_reference` (`payment_reference`),
+  KEY `idx_demo_payment_status` (`status`),
+  KEY `idx_demo_payment_method` (`method`),
+  KEY `idx_demo_payment_user` (`id_user`),
+  KEY `idx_demo_payment_customer` (`id_customer`),
+  KEY `idx_demo_payment_penjualan` (`id_penjualan`),
+  CONSTRAINT `fk_demo_payment_user` FOREIGN KEY (`id_user`) REFERENCES `users` (`id_user`) ON DELETE RESTRICT ON UPDATE CASCADE,
+  CONSTRAINT `fk_demo_payment_customer` FOREIGN KEY (`id_customer`) REFERENCES `customer` (`id_customer`) ON DELETE RESTRICT ON UPDATE CASCADE,
+  CONSTRAINT `fk_demo_payment_penjualan` FOREIGN KEY (`id_penjualan`) REFERENCES `penjualan` (`id_penjualan`) ON DELETE SET NULL ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
 CREATE TABLE `audit_logs` (
   `id_audit` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   `id_user` INT NULL,

@@ -344,6 +344,31 @@
                                 <strong><?= esc($penjualan['metode_pembayaran'] ?? 'Tunai') ?></strong>
                             </div>
 
+                            <?php
+                                $paymentStatus = $payment['status'] ?? 'PAID';
+                                $paymentStatusClass = match ($paymentStatus) {
+                                    'PAID' => 'text-bg-success',
+                                    'PENDING' => 'text-bg-warning',
+                                    'EXPIRED', 'FAILED' => 'text-bg-danger',
+                                    'CANCELLED' => 'text-bg-secondary',
+                                    default => 'text-bg-light',
+                                };
+                            ?>
+                            <div class="payment-row">
+                                <span>Status Pembayaran</span>
+                                <span class="badge <?= $paymentStatusClass ?>"><?= esc($paymentStatus) ?></span>
+                            </div>
+
+                            <div class="payment-row">
+                                <span>Payment Reference</span>
+                                <strong class="font-monospace"><?= esc($payment['payment_reference'] ?? '-') ?></strong>
+                            </div>
+
+                            <div class="payment-row">
+                                <span>Dibayar Pada</span>
+                                <span><?= date('d/m/Y H:i:s', strtotime($payment['paid_at'] ?? $penjualan['tanggal'])) ?> WIB</span>
+                            </div>
+
                             <div class="payment-row">
 
                                 <span>
