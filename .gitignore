@@ -1,0 +1,29 @@
+# KAMELA security-sensitive local configuration
+.env
+.env.*
+!.env.example
+!.env.production.example
+
+# Runtime data
+writable/cache/*
+writable/debugbar/*
+writable/logs/*
+writable/session/*
+writable/uploads/*
+writable/backups/*
+
+# Keep folder placeholders if used
+!writable/**/.gitkeep
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Local backup/export files
+*.sql.bak
+*.backup
+*.kamela-backup
+
+writable/backups/

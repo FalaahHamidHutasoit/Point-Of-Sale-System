@@ -36,6 +36,7 @@ class Filters extends BaseFilters
         'performance'   => PerformanceMetrics::class,
         'auth' => \App\Filters\AuthFilter::class,
         'role' => \App\Filters\RoleFilter::class,
+        'kamelaheaders' => \App\Filters\KamelaSecurityHeaders::class,
     ];
 
     /**
@@ -79,8 +80,8 @@ class Filters extends BaseFilters
             // 'invalidchars',
         ],
         'after' => [
-            // 'honeypot',
-            // 'secureheaders',
+            // KAMELA Phase 6: response hardening untuk public maupun authenticated pages.
+            'kamelaheaders',
         ],
     ];
 

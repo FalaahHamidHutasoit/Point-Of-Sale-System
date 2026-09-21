@@ -13,196 +13,203 @@ class Supplier extends BaseController
         $this->supplierModel = new SupplierModel();
     }
 
-    // =========================
-    // INDEX
-    // =========================
     public function index()
     {
-        if (!session()->get('logged_in')) {
-            return redirect()->to('/login');
-        }
+        $keyword = trim((string) $this->request->getGet('keyword'));
+        $builder = $this->supplierModel;
 
-        $keyword = $this->request->getGet('keyword');
-
-        if ($keyword) {
-            $dataSupplier = $this->supplierModel
-                ->groupStart()
+        if ($keyword !== '') {
+            $builder->groupStart()
                 ->like('nama_supplier', $keyword)
                 ->orLike('no_telp', $keyword)
                 ->orLike('alamat', $keyword)
-                ->groupEnd()
-                ->orderBy('id_supplier', 'DESC')
-                ->findAll();
-        } else {
-            $dataSupplier = $this->supplierModel
-                ->orderBy('id_supplier', 'DESC')
-                ->findAll();
+                ->groupEnd();
         }
 
-        $data = [
+        return view('supplier/index', [
             'title' => 'Data Supplier',
-            'supplier' => $dataSupplier,
-            'keyword' => $keyword
-        ];
-
-        return view('supplier/index', $data);
+            'supplier' => $builder->orderBy('id_supplier', 'DESC')->findAll(),
+            'keyword' => $keyword,
+        ]);
     }
 
-    // =========================
-    // TAMBAH
-    // =========================
     public function tambah()
     {
-        if (!session()->get('logged_in')) {
-            return redirect()->to('/login');
-        }
-
-        return view('supplier/tambah', [
-            'title' => 'Tambah Supplier'
-        ]);
+        return view('supplier/tambah', ['title' => 'Tambah Supplier']);
     }
 
-    // =========================
-    // SIMPAN
-    // =========================
     public function simpan()
     {
-        if (!session()->get('logged_in')) {
-            return redirect()->to('/login');
+        if ($guard = $this->guardSensitivePost(['admin'])) {
+            return $guard;
         }
 
-        $rules = [
-            'nama_supplier' => [
-                'rules' => 'required|min_length[3]',
-                'errors' => [
-                    'required' => 'Nama supplier wajib diisi.',
-                    'min_length' => 'Nama supplier minimal 3 karakter.'
-                ]
-            ],
-            'no_telp' => [
-                'rules' => 'permit_empty|max_length[20]',
-                'errors' => [
-                    'max_length' => 'Nomor telepon terlalu panjang.'
-                ]
-            ],
-            'alamat' => [
-                'rules' => 'permit_empty'
-            ]
+        $nama = trim((string) $this->request->getPost('nama_supplier'));
+        $noTelp = trim((string) $this->request->getPost('no_telp'));
+        $alamat = trim((string) $this->request->getPost('alamat'));
+
+        if ($error = $this->validasiSupplier($nama, $noTelp, $alamat)) {
+            return redirect()->back()->withInput()->with('error', $error);
+        }
+
+        if (!$this->supplierModel->insert([
+            'nama_supplier' => $nama,
+            'no_telp' => $noTelp ?: null,
+            'alamat' => $alamat ?: null,
+        ])) {
+            return redirect()->back()->withInput()->with('error', 'Supplier gagal disimpan.');
+        }
+
+        $idSupplier = (int) $this->supplierModel->getInsertID();
+        $after = [
+            'id_supplier' => $idSupplier,
+            'nama_supplier' => $nama,
+            'no_telp' => $noTelp ?: null,
+            'alamat' => $alamat ?: null,
         ];
+        $this->auditEvent('CREATE', 'SUPPLIER', $idSupplier, $nama, 'Supplier baru ditambahkan.', null, $after);
 
-        if (!$this->validate($rules)) {
-            return redirect()->back()
-                ->withInput()
-                ->with('errors', $this->validator->getErrors());
-        }
-
-        $this->supplierModel->insert([
-            'nama_supplier' => $this->request->getPost('nama_supplier'),
-            'no_telp' => $this->request->getPost('no_telp'),
-            'alamat' => $this->request->getPost('alamat')
-        ]);
-
-        return redirect()->to('/supplier')
-            ->with('success', 'Supplier berhasil ditambahkan.');
+        return redirect()->to('/supplier')->with('success', 'Supplier berhasil ditambahkan.');
     }
 
-    // =========================
-    // EDIT
-    // =========================
     public function edit($id)
     {
-        if (!session()->get('logged_in')) {
-            return redirect()->to('/login');
-        }
-
-        $supplier = $this->supplierModel->find($id);
-
+        $supplier = $this->supplierModel->find((int) $id);
         if (!$supplier) {
-            return redirect()->to('/supplier')
-                ->with('error', 'Data supplier tidak ditemukan.');
+            return redirect()->to('/supplier')->with('error', 'Data supplier tidak ditemukan.');
         }
 
         return view('supplier/edit', [
             'title' => 'Edit Supplier',
-            'supplier' => $supplier
+            'supplier' => $supplier,
         ]);
     }
 
-    // =========================
-    // UPDATE
-    // =========================
     public function update($id)
     {
-        if (!session()->get('logged_in')) {
-            return redirect()->to('/login');
+        if ($guard = $this->guardSensitivePost(['admin'])) {
+            return $guard;
         }
 
+        $id = (int) $id;
         $supplier = $this->supplierModel->find($id);
-
         if (!$supplier) {
-            return redirect()->to('/supplier')
-                ->with('error', 'Data supplier tidak ditemukan.');
+            return redirect()->to('/supplier')->with('error', 'Data supplier tidak ditemukan.');
         }
 
-        $rules = [
-            'nama_supplier' => [
-                'rules' => 'required|min_length[3]',
-                'errors' => [
-                    'required' => 'Nama supplier wajib diisi.',
-                    'min_length' => 'Nama supplier minimal 3 karakter.'
-                ]
-            ],
-            'no_telp' => [
-                'rules' => 'permit_empty|max_length[20]',
-                'errors' => [
-                    'max_length' => 'Nomor telepon terlalu panjang.'
-                ]
-            ],
-            'alamat' => [
-                'rules' => 'permit_empty'
-            ]
+        $nama = trim((string) $this->request->getPost('nama_supplier'));
+        $noTelp = trim((string) $this->request->getPost('no_telp'));
+        $alamat = trim((string) $this->request->getPost('alamat'));
+
+        if ($error = $this->validasiSupplier($nama, $noTelp, $alamat)) {
+            return redirect()->back()->withInput()->with('error', $error);
+        }
+
+        $after = [
+            'id_supplier' => $id,
+            'nama_supplier' => $nama,
+            'no_telp' => $noTelp ?: null,
+            'alamat' => $alamat ?: null,
         ];
 
-        if (!$this->validate($rules)) {
-            return redirect()->back()
-                ->withInput()
-                ->with('errors', $this->validator->getErrors());
+        if (!$this->supplierModel->update($id, [
+            'nama_supplier' => $nama,
+            'no_telp' => $noTelp ?: null,
+            'alamat' => $alamat ?: null,
+        ])) {
+            return redirect()->back()->withInput()->with('error', 'Supplier gagal diperbarui.');
         }
 
-        $this->supplierModel->update($id, [
-            'nama_supplier' => $this->request->getPost('nama_supplier'),
-            'no_telp' => $this->request->getPost('no_telp'),
-            'alamat' => $this->request->getPost('alamat')
-        ]);
+        $this->auditEvent('UPDATE', 'SUPPLIER', $id, $nama, 'Data supplier diperbarui.', $supplier, $after);
 
-        return redirect()->to('/supplier')
-            ->with('success', 'Supplier berhasil diperbarui.');
+        return redirect()->to('/supplier')->with('success', 'Supplier berhasil diperbarui.');
     }
 
-    // =========================
-    // HAPUS
-    // =========================
     public function hapus($id)
     {
-        if (!session()->get('logged_in')) {
-            return redirect()->to('/login');
+        if ($guard = $this->guardSensitivePost(['admin'])) {
+            return $guard;
         }
 
-        $supplier = $this->supplierModel->find($id);
-
-        if (!$supplier) {
-            return redirect()->to('/supplier')
-                ->with('error', 'Data supplier tidak ditemukan.');
+        $id = (int) $id;
+        if ($id <= 0) {
+            return redirect()->to('/supplier')->with('error', 'Supplier tidak valid.');
         }
+
+        $db = \Config\Database::connect();
+        $db->transBegin();
 
         try {
-            $this->supplierModel->delete($id);
+            $supplier = $db->query(
+                'SELECT id_supplier, nama_supplier FROM supplier WHERE id_supplier = ? FOR UPDATE',
+                [$id]
+            )->getRowArray();
 
-            return redirect()->to('/supplier')
-                ->with('success', 'Supplier berhasil dihapus.');
+            if (!$supplier) {
+                $db->transRollback();
+                return redirect()->to('/supplier')->with('error', 'Data supplier tidak ditemukan.');
+            }
+
+            $jumlahPembelian = (int) $db->table('pembelian')
+                ->where('id_supplier', $id)
+                ->countAllResults();
+
+            if ($jumlahPembelian > 0) {
+                $db->transRollback();
+                $this->auditEvent(
+                    'DELETE',
+                    'SUPPLIER',
+                    $id,
+                    $supplier['nama_supplier'],
+                    'Penghapusan supplier diblokir karena sudah memiliki histori pembelian.',
+                    $supplier,
+                    ['jumlah_pembelian' => $jumlahPembelian],
+                    'BLOCKED'
+                );
+                return redirect()->to('/supplier')->with(
+                    'error',
+                    'Supplier tidak dapat dihapus karena sudah tercatat pada ' . $jumlahPembelian . ' transaksi pembelian.'
+                );
+            }
+
+            $db->table('supplier')->where('id_supplier', $id)->delete();
+            if ($db->affectedRows() !== 1 || $db->transStatus() === false) {
+                throw new \RuntimeException('Penghapusan supplier gagal.');
+            }
+
+            $db->transCommit();
+            $this->auditEvent(
+                'DELETE',
+                'SUPPLIER',
+                $id,
+                $supplier['nama_supplier'],
+                'Supplier yang belum memiliki histori berhasil dihapus.',
+                $supplier,
+                null
+            );
+            return redirect()->to('/supplier')->with('success', 'Supplier yang belum memiliki histori berhasil dihapus.');
         } catch (\Throwable $e) {
-            return redirect()->to('/supplier')
-                ->with('error', 'Supplier tidak dapat dihapus.');
+            $db->transRollback();
+            log_message('error', 'Gagal menghapus supplier: {message}', ['message' => $e->getMessage()]);
+            return redirect()->to('/supplier')->with('error', 'Supplier tidak dapat dihapus.');
         }
+    }
+
+    private function validasiSupplier(string $nama, string $noTelp, string $alamat): ?string
+    {
+        if (mb_strlen($nama) < 3) {
+            return 'Nama supplier minimal 3 karakter.';
+        }
+        if (mb_strlen($nama) > 100) {
+            return 'Nama supplier maksimal 100 karakter.';
+        }
+        if (mb_strlen($noTelp) > 20) {
+            return 'Nomor telepon maksimal 20 karakter.';
+        }
+        if (mb_strlen($alamat) > 1000) {
+            return 'Alamat terlalu panjang.';
+        }
+
+        return null;
     }
 }

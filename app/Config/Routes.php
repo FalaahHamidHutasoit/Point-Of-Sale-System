@@ -7,8 +7,7 @@ use CodeIgniter\Router\RouteCollection;
 $routes->get('/', 'Auth::index');
 $routes->get('/login', 'Auth::index');
 $routes->post('/login/process', 'Auth::login');
-$routes->get('/logout', 'Auth::logout');
-$routes->get('/setup-user', 'Setup::createUser');
+$routes->post('/logout', 'Auth::logout');
 
 $routes->group('', ['filter' => 'auth'], function ($routes) {
     $routes->get('/dashboard', 'Dashboard::index');
@@ -56,8 +55,24 @@ $routes->group('', ['filter' => 'auth'], function ($routes) {
         $routes->get('/pembelian/(:num)', 'Pembelian::detail/$1');
 
         $routes->get('/stok/mutasi', 'Stok::index');
+        $routes->get('/stok/opname', 'StockOpname::index');
+        $routes->post('/stok/opname/create', 'StockOpname::create');
+        $routes->get('/stok/opname/(:num)', 'StockOpname::detail/$1');
+        $routes->post('/stok/opname/(:num)/save', 'StockOpname::saveCounts/$1');
+        $routes->post('/stok/opname/(:num)/finalize', 'StockOpname::finalize/$1');
+        $routes->post('/stok/opname/(:num)/cancel', 'StockOpname::cancel/$1');
 
         $routes->get('/laporan/penjualan', 'Penjualan::laporan');
         $routes->get('/laporan/barang', 'Barang::laporanBarang');
+
+        // Phase 3: audit trail hanya dapat dibaca oleh Admin.
+        $routes->get('/audit', 'AuditLog::index');
+
+        // Phase 4: backup/recovery hanya Admin. Semua mutasi memakai POST + CSRF.
+        $routes->get('/system/backup', 'SystemBackup::index');
+        $routes->post('/system/backup/create', 'SystemBackup::create');
+        $routes->get('/system/backup/download/(:segment)', 'SystemBackup::download/$1');
+        $routes->post('/system/backup/restore/(:segment)', 'SystemBackup::restore/$1');
+        $routes->post('/system/backup/delete/(:segment)', 'SystemBackup::delete/$1');
     });
 });

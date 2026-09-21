@@ -1,0 +1,17 @@
+# KAMELA root hardening.
+# Production web root SHOULD point to /public, not project root.
+Options -Indexes
+ServerSignature Off
+
+<IfModule mod_authz_core.c>
+    <FilesMatch "(^\.|\.env$|composer\.(json|lock)$|.*\.(sql|log|ini|bak|backup)$)">
+        Require all denied
+    </FilesMatch>
+</IfModule>
+
+<IfModule !mod_authz_core.c>
+    <FilesMatch "(^\.|\.env$|composer\.(json|lock)$|.*\.(sql|log|ini|bak|backup)$)">
+        Order allow,deny
+        Deny from all
+    </FilesMatch>
+</IfModule>

@@ -186,7 +186,7 @@
             }));
         } catch (error) {
             if (error.name === 'AbortError') return;
-            console.error('[NexaPOS AJAX]', error);
+            console.error('[KAMELA AJAX]', error);
             // Progressive enhancement: jika AJAX gagal, fallback ke navigasi normal.
             window.location.href = url.toString();
         } finally {
