@@ -7,6 +7,7 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="<?= base_url('assets/js/ajax-table.js') ?>" defer></script>
     <style>
         :root{--brand:#2563eb;--brand-dark:#1d4ed8;--ink:#18212f;--muted:#6b7280;--border:#e5e7eb;--surface:#fff;--bg:#f6f8fc;--sidebar:#111827;--success:#0f9f6e;--danger:#dc2626;--warning:#d97706}
         *{font-family:'Inter',sans-serif;box-sizing:border-box}
