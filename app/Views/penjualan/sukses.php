@@ -340,6 +340,11 @@
 
 
                             <div class="payment-row">
+                                <span>Metode Pembayaran</span>
+                                <strong><?= esc($penjualan['metode_pembayaran'] ?? 'Tunai') ?></strong>
+                            </div>
+
+                            <div class="payment-row">
 
                                 <span>
                                     Uang Dibayar

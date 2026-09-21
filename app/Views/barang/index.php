@@ -425,14 +425,10 @@
                                         </a>
 
 
-                                        <a href="<?= base_url('/barang/hapus/' . $row['id_barang']) ?>"
-                                           class="btn btn-outline-danger action-btn"
-                                           title="Hapus barang"
-                                           onclick="return confirm('Yakin ingin menghapus barang ini?')">
-
-                                            <i class="bi bi-trash"></i>
-
-                                        </a>
+                                        <form method="post" action="<?= base_url('/barang/hapus/' . $row['id_barang']) ?>" class="d-inline" onsubmit="return confirm('Yakin ingin menghapus barang ini?')">
+                                            <?= csrf_field() ?>
+                                            <button class="btn btn-outline-danger action-btn" title="Hapus barang"><i class="bi bi-trash"></i></button>
+                                        </form>
 
                                     </div>
 

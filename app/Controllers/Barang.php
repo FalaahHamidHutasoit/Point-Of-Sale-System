@@ -4,37 +4,30 @@ namespace App\Controllers;
 
 use App\Models\BarangModel;
 use App\Models\KategoriModel;
+use App\Models\MutasiStokModel;
 
 class Barang extends BaseController
 {
     protected $barangModel;
     protected $kategoriModel;
+    protected $mutasiModel;
 
     public function __construct()
     {
         $this->barangModel = new BarangModel();
         $this->kategoriModel = new KategoriModel();
+        $this->mutasiModel = new MutasiStokModel();
     }
 
-    // =========================
-    // MENAMPILKAN DATA BARANG
-    // =========================
     public function index()
     {
-        if (!session()->get('logged_in')) {
-            return redirect()->to('/login');
-        }
-
-        $keyword = $this->request->getGet('keyword');
+        $keyword = trim((string) $this->request->getGet('keyword'));
 
         $builder = $this->barangModel
             ->select('barang.*, kategori.nama_kategori')
-            ->join(
-                'kategori',
-                'kategori.id_kategori = barang.id_kategori'
-            );
+            ->join('kategori', 'kategori.id_kategori = barang.id_kategori');
 
-        if ($keyword) {
+        if ($keyword !== '') {
             $builder->groupStart()
                 ->like('barang.kode_barang', $keyword)
                 ->orLike('barang.nama_barang', $keyword)
@@ -42,242 +35,167 @@ class Barang extends BaseController
                 ->groupEnd();
         }
 
-        $data = [
+        return view('barang/index', [
             'title' => 'Data Barang',
-            'barang' => $builder->orderBy('barang.id_barang', 'DESC')->findAll(),
-            'keyword' => $keyword
-        ];
-
-        return view('barang/index', $data);
+            'barang' => $builder->orderBy('barang.nama_barang', 'ASC')->findAll(),
+            'keyword' => $keyword,
+        ]);
     }
 
-    // =========================
-    // FORM TAMBAH
-    // =========================
     public function tambah()
     {
-        if (!session()->get('logged_in')) {
-            return redirect()->to('/login');
-        }
-
-        $data = [
+        return view('barang/tambah', [
             'title' => 'Tambah Barang',
-            'kategori' => $this->kategoriModel->findAll()
-        ];
-
-        return view('barang/tambah', $data);
+            'kategori' => $this->kategoriModel->orderBy('nama_kategori', 'ASC')->findAll(),
+        ]);
     }
 
-    // =========================
-    // SIMPAN BARANG
-    // =========================
     public function simpan()
     {
-        if (!session()->get('logged_in')) {
-            return redirect()->to('/login');
+        $kode = trim((string) $this->request->getPost('kode_barang'));
+        $nama = trim((string) $this->request->getPost('nama_barang'));
+        $kategori = (int) $this->request->getPost('id_kategori');
+        $hargaBeli = (float) $this->request->getPost('harga_beli');
+        $hargaJual = (float) $this->request->getPost('harga_jual');
+        $stokAwal = (int) $this->request->getPost('stok');
+        $satuan = trim((string) $this->request->getPost('satuan'));
+
+        if ($kode === '' || $nama === '' || !$kategori || $satuan === '') {
+            return redirect()->back()->withInput()->with('error', 'Kode, nama, kategori, dan satuan wajib diisi.');
+        }
+        if ($hargaBeli < 0 || $hargaJual < 0 || $stokAwal < 0) {
+            return redirect()->back()->withInput()->with('error', 'Harga dan stok tidak boleh negatif.');
+        }
+        if ($this->barangModel->where('kode_barang', $kode)->first()) {
+            return redirect()->back()->withInput()->with('error', 'Kode barang sudah digunakan.');
         }
 
-        $kode = trim($this->request->getPost('kode_barang'));
-        $nama = trim($this->request->getPost('nama_barang'));
-        $kategori = $this->request->getPost('id_kategori');
-        $hargaBeli = $this->request->getPost('harga_beli');
-        $hargaJual = $this->request->getPost('harga_jual');
-        $stok = $this->request->getPost('stok');
-        $satuan = trim($this->request->getPost('satuan'));
+        $db = \Config\Database::connect();
+        $db->transBegin();
+        try {
+            $this->barangModel->insert([
+                'id_kategori' => $kategori,
+                'kode_barang' => $kode,
+                'nama_barang' => $nama,
+                'harga_beli' => $hargaBeli,
+                'harga_jual' => $hargaJual,
+                'stok' => $stokAwal,
+                'satuan' => $satuan,
+            ]);
+            $idBarang = $this->barangModel->getInsertID();
 
-        // Validasi
-        if (
-            empty($kode) ||
-            empty($nama) ||
-            empty($kategori) ||
-            $hargaBeli === '' ||
-            $hargaJual === '' ||
-            $stok === '' ||
-            empty($satuan)
-        ) {
-            return redirect()->back()
-                ->withInput()
-                ->with('error', 'Semua field wajib diisi.');
+            if ($stokAwal > 0) {
+                $this->mutasiModel->insert([
+                    'id_barang' => $idBarang,
+                    'id_user' => (int) session()->get('id_user'),
+                    'tipe' => 'PENYESUAIAN',
+                    'qty' => $stokAwal,
+                    'stok_sebelum' => 0,
+                    'stok_sesudah' => $stokAwal,
+                    'referensi_tipe' => 'STOK_AWAL',
+                    'referensi_id' => $idBarang,
+                    'keterangan' => 'Stok awal saat barang dibuat',
+                ]);
+            }
+
+            if ($db->transStatus() === false) {
+                throw new \RuntimeException('Gagal menyimpan barang');
+            }
+            $db->transCommit();
+            return redirect()->to('/barang')->with('success', 'Barang berhasil ditambahkan. Restock berikutnya lakukan melalui menu Pembelian.');
+        } catch (\Throwable $e) {
+            $db->transRollback();
+            return redirect()->back()->withInput()->with('error', 'Barang gagal disimpan.');
         }
-
-        if ($hargaBeli < 0 || $hargaJual < 0 || $stok < 0) {
-            return redirect()->back()
-                ->withInput()
-                ->with('error', 'Harga dan stok tidak boleh bernilai negatif.');
-        }
-
-        // Cek kode barang
-        $cekKode = $this->barangModel
-            ->where('kode_barang', $kode)
-            ->first();
-
-        if ($cekKode) {
-            return redirect()->back()
-                ->withInput()
-                ->with('error', 'Kode barang sudah digunakan.');
-        }
-
-        $this->barangModel->insert([
-            'id_kategori' => $kategori,
-            'kode_barang' => $kode,
-            'nama_barang' => $nama,
-            'harga_beli' => $hargaBeli,
-            'harga_jual' => $hargaJual,
-            'stok' => $stok,
-            'satuan' => $satuan
-        ]);
-
-        return redirect()->to('/barang')
-            ->with('success', 'Barang berhasil ditambahkan.');
     }
 
-    // =========================
-    // FORM EDIT
-    // =========================
     public function edit($id)
     {
-        if (!session()->get('logged_in')) {
-            return redirect()->to('/login');
-        }
-
         $barang = $this->barangModel->find($id);
-
         if (!$barang) {
-            return redirect()->to('/barang')
-                ->with('error', 'Data barang tidak ditemukan.');
+            return redirect()->to('/barang')->with('error', 'Data barang tidak ditemukan.');
         }
 
-        $data = [
+        return view('barang/edit', [
             'title' => 'Edit Barang',
             'barang' => $barang,
-            'kategori' => $this->kategoriModel->findAll()
-        ];
-
-        return view('barang/edit', $data);
+            'kategori' => $this->kategoriModel->orderBy('nama_kategori', 'ASC')->findAll(),
+        ]);
     }
 
-    // =========================
-    // UPDATE BARANG
-    // =========================
     public function update($id)
     {
-        if (!session()->get('logged_in')) {
-            return redirect()->to('/login');
-        }
-
         $barang = $this->barangModel->find($id);
-
         if (!$barang) {
-            return redirect()->to('/barang')
-                ->with('error', 'Data barang tidak ditemukan.');
+            return redirect()->to('/barang')->with('error', 'Data barang tidak ditemukan.');
         }
 
-        $kode = trim($this->request->getPost('kode_barang'));
-        $nama = trim($this->request->getPost('nama_barang'));
-        $kategori = $this->request->getPost('id_kategori');
-        $hargaBeli = $this->request->getPost('harga_beli');
-        $hargaJual = $this->request->getPost('harga_jual');
-        $stok = $this->request->getPost('stok');
-        $satuan = trim($this->request->getPost('satuan'));
+        $kode = trim((string) $this->request->getPost('kode_barang'));
+        $nama = trim((string) $this->request->getPost('nama_barang'));
+        $kategori = (int) $this->request->getPost('id_kategori');
+        $hargaBeli = (float) $this->request->getPost('harga_beli');
+        $hargaJual = (float) $this->request->getPost('harga_jual');
+        $satuan = trim((string) $this->request->getPost('satuan'));
 
-        if (
-            empty($kode) ||
-            empty($nama) ||
-            empty($kategori) ||
-            $hargaBeli === '' ||
-            $hargaJual === '' ||
-            $stok === '' ||
-            empty($satuan)
-        ) {
-            return redirect()->back()
-                ->withInput()
-                ->with('error', 'Semua field wajib diisi.');
+        if ($kode === '' || $nama === '' || !$kategori || $satuan === '') {
+            return redirect()->back()->withInput()->with('error', 'Semua data barang wajib diisi.');
+        }
+        if ($hargaBeli < 0 || $hargaJual < 0) {
+            return redirect()->back()->withInput()->with('error', 'Harga tidak boleh negatif.');
         }
 
-        if ($hargaBeli < 0 || $hargaJual < 0 || $stok < 0) {
-            return redirect()->back()
-                ->withInput()
-                ->with('error', 'Harga dan stok tidak boleh bernilai negatif.');
+        $duplikat = $this->barangModel->where('kode_barang', $kode)->where('id_barang !=', $id)->first();
+        if ($duplikat) {
+            return redirect()->back()->withInput()->with('error', 'Kode barang sudah digunakan barang lain.');
         }
 
-        // Cek kode barang agar tidak sama dengan barang lain
-        $cekKode = $this->barangModel
-            ->where('kode_barang', $kode)
-            ->where('id_barang !=', $id)
-            ->first();
-
-        if ($cekKode) {
-            return redirect()->back()
-                ->withInput()
-                ->with('error', 'Kode barang sudah digunakan oleh barang lain.');
-        }
-
+        // Stok tidak diubah dari form edit. Semua perubahan stok harus punya jejak mutasi.
         $this->barangModel->update($id, [
             'id_kategori' => $kategori,
             'kode_barang' => $kode,
             'nama_barang' => $nama,
             'harga_beli' => $hargaBeli,
             'harga_jual' => $hargaJual,
-            'stok' => $stok,
-            'satuan' => $satuan
+            'satuan' => $satuan,
         ]);
 
-        return redirect()->to('/barang')
-            ->with('success', 'Barang berhasil diperbarui.');
+        return redirect()->to('/barang')->with('success', 'Data barang diperbarui. Stok tidak berubah.');
     }
 
-    // =========================
-    // HAPUS BARANG
-    // =========================
     public function hapus($id)
     {
-        if (!session()->get('logged_in')) {
-            return redirect()->to('/login');
-        }
-
         $barang = $this->barangModel->find($id);
-
         if (!$barang) {
-            return redirect()->to('/barang')
-                ->with('error', 'Data barang tidak ditemukan.');
+            return redirect()->to('/barang')->with('error', 'Data barang tidak ditemukan.');
         }
 
         try {
-
             $this->barangModel->delete($id);
-
-            return redirect()->to('/barang')
-                ->with('success', 'Barang berhasil dihapus.');
-
-        } catch (\Exception $e) {
-
-            return redirect()->to('/barang')
-                ->with('error', 'Barang tidak dapat dihapus karena sudah digunakan dalam transaksi.');
+            return redirect()->to('/barang')->with('success', 'Barang berhasil dihapus.');
+        } catch (\Throwable $e) {
+            return redirect()->to('/barang')->with('error', 'Barang tidak dapat dihapus karena sudah memiliki histori transaksi.');
         }
     }
 
     public function laporanBarang()
-{
-    $keyword = $this->request->getGet('keyword');
+    {
+        $keyword = trim((string) $this->request->getGet('keyword'));
+        $builder = $this->barangModel
+            ->select('barang.*, kategori.nama_kategori')
+            ->join('kategori', 'kategori.id_kategori = barang.id_kategori');
 
-    $builder = $this->barangModel
-        ->select('barang.*, kategori.nama_kategori')
-        ->join('kategori', 'kategori.id_kategori = barang.id_kategori');
+        if ($keyword !== '') {
+            $builder->groupStart()
+                ->like('barang.kode_barang', $keyword)
+                ->orLike('barang.nama_barang', $keyword)
+                ->orLike('kategori.nama_kategori', $keyword)
+                ->groupEnd();
+        }
 
-    if ($keyword) {
-        $builder->groupStart()
-            ->like('barang.kode_barang', $keyword)
-            ->orLike('barang.nama_barang', $keyword)
-            ->orLike('kategori.nama_kategori', $keyword)
-            ->groupEnd();
+        return view('laporan/barang', [
+            'title' => 'Laporan Persediaan',
+            'barang' => $builder->orderBy('barang.nama_barang', 'ASC')->findAll(),
+            'keyword' => $keyword,
+        ]);
     }
-
-    $data = [
-        'title'   => 'Laporan Barang',
-        'barang'  => $builder->orderBy('barang.nama_barang', 'ASC')->findAll(),
-        'keyword' => $keyword
-    ];
-
-    return view('laporan/barang', $data);
-}
 }

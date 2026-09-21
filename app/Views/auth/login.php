@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <title>Login - POS System</title>
+    <title>Login - NexaPOS</title>
 
     <!-- Bootstrap -->
     <link
@@ -282,7 +282,7 @@
                 </div>
 
                 <h1>
-                    POS SYSTEM
+                    NexaPOS
                 </h1>
 
                 <p>
@@ -351,6 +351,7 @@
                     <form
                         action="<?= base_url('login/process') ?>"
                         method="post">
+                        <?= csrf_field() ?>
 
 
                         <!-- USERNAME -->

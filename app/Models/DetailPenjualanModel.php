@@ -14,6 +14,7 @@ class DetailPenjualanModel extends Model
         'id_barang',
         'qty',
         'harga',
+        'harga_modal',
         'subtotal'
     ];
 

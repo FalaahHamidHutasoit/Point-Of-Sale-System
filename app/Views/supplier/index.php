@@ -346,14 +346,10 @@
                                                 <i class="bi bi-pencil-square"></i>
                                             </a>
 
-                                            <a
-                                                href="<?= base_url('supplier/hapus/' . $row['id_supplier']) ?>"
-                                                class="action-btn delete-btn"
-                                                title="Hapus supplier"
-                                                onclick="return confirm('Yakin ingin menghapus supplier ini?')"
-                                            >
-                                                <i class="bi bi-trash"></i>
-                                            </a>
+                                            <form method="post" action="<?= base_url('supplier/hapus/' . $row['id_supplier']) ?>" class="d-inline" onsubmit="return confirm('Yakin ingin menghapus supplier ini?')">
+                                                <?= csrf_field() ?>
+                                                <button class="action-btn delete-btn border-0" title="Hapus supplier"><i class="bi bi-trash"></i></button>
+                                            </form>
 
                                         </div>
 

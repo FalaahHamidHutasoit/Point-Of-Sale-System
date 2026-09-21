@@ -2,10 +2,11 @@
 
 namespace App\Controllers;
 
-use App\Models\PenjualanModel;
-use App\Models\DetailPenjualanModel;
 use App\Models\BarangModel;
 use App\Models\CustomerModel;
+use App\Models\DetailPenjualanModel;
+use App\Models\MutasiStokModel;
+use App\Models\PenjualanModel;
 
 class Penjualan extends BaseController
 {
@@ -13,6 +14,7 @@ class Penjualan extends BaseController
     protected $detailModel;
     protected $barangModel;
     protected $customerModel;
+    protected $mutasiModel;
 
     public function __construct()
     {
@@ -20,393 +22,213 @@ class Penjualan extends BaseController
         $this->detailModel = new DetailPenjualanModel();
         $this->barangModel = new BarangModel();
         $this->customerModel = new CustomerModel();
+        $this->mutasiModel = new MutasiStokModel();
     }
 
-    // ==========================================
-    // HALAMAN TRANSAKSI
-    // ==========================================
     public function index()
     {
-        if (!session()->get('logged_in')) {
-            return redirect()->to('/login');
-        }
-
-        $data = [
+        return view('penjualan/index', [
             'title' => 'Transaksi Penjualan',
-
-            'customer' => $this->customerModel
-                ->orderBy('nama_customer', 'ASC')
-                ->findAll(),
-
+            'customer' => $this->customerModel->orderBy('nama_customer', 'ASC')->findAll(),
             'barang' => $this->barangModel
-                ->where('stok >', 0)
-                ->orderBy('nama_barang', 'ASC')
-                ->findAll()
-        ];
-
-        return view('penjualan/index', $data);
+                ->select('barang.*, kategori.nama_kategori')
+                ->join('kategori', 'kategori.id_kategori = barang.id_kategori', 'left')
+                ->where('barang.stok >', 0)
+                ->orderBy('barang.nama_barang', 'ASC')
+                ->findAll(),
+        ]);
     }
 
-    // ==========================================
-    // SIMPAN TRANSAKSI
-    // ==========================================
     public function simpan()
     {
-        if (!session()->get('logged_in')) {
-            return redirect()->to('/login');
-        }
-
         $customer = $this->request->getPost('id_customer');
-        $barang = $this->request->getPost('id_barang');
-        $qty = $this->request->getPost('qty');
-        $bayar = $this->request->getPost('bayar');
-
-        // Validasi dasar
-        if (empty($barang)) {
-            return redirect()->back()
-                ->withInput()
-                ->with('error', 'Barang belum dipilih.');
+        $barangIds = $this->request->getPost('id_barang');
+        $qtys = $this->request->getPost('qty');
+        $bayar = (float) $this->request->getPost('bayar');
+        $metode = trim((string) $this->request->getPost('metode_pembayaran')) ?: 'Tunai';
+        if (!in_array($metode, ['Tunai', 'QRIS', 'Transfer'], true)) {
+            $metode = 'Tunai';
         }
 
-        if (empty($qty)) {
-            return redirect()->back()
-                ->withInput()
-                ->with('error', 'Jumlah barang belum diisi.');
+        if (!is_array($barangIds) || !is_array($qtys)) {
+            return redirect()->back()->withInput()->with('error', 'Keranjang masih kosong.');
         }
 
-        if ($bayar === null || $bayar === '') {
-            return redirect()->back()
-                ->withInput()
-                ->with('error', 'Nominal pembayaran belum diisi.');
+        // Gabungkan barang yang sama agar validasi stok menggunakan total qty per barang.
+        $requested = [];
+        foreach ($barangIds as $i => $idBarang) {
+            $idBarang = (int) $idBarang;
+            $qty = (int) ($qtys[$i] ?? 0);
+            if ($idBarang > 0 && $qty > 0) {
+                $requested[$idBarang] = ($requested[$idBarang] ?? 0) + $qty;
+            }
         }
 
-        // Pastikan array
-        if (!is_array($barang)) {
-            $barang = [$barang];
+        if (!$requested) {
+            return redirect()->back()->withInput()->with('error', 'Minimal harus ada satu barang.');
         }
 
-        if (!is_array($qty)) {
-            $qty = [$qty];
-        }
-
-        // ==========================================
-        // HITUNG TOTAL DAN VALIDASI STOK
-        // ==========================================
-        $total = 0;
         $items = [];
-
-        foreach ($barang as $key => $id_barang) {
-
-            $jumlah = (int) ($qty[$key] ?? 0);
-
-            if ($jumlah <= 0) {
-                continue;
+        $total = 0;
+        foreach ($requested as $idBarang => $qty) {
+            $barang = $this->barangModel->find($idBarang);
+            if (!$barang) {
+                return redirect()->back()->withInput()->with('error', 'Ada barang yang tidak ditemukan.');
+            }
+            if ($qty > (int) $barang['stok']) {
+                return redirect()->back()->withInput()->with('error', 'Stok ' . $barang['nama_barang'] . ' tidak cukup. Tersedia: ' . $barang['stok'] . '.');
             }
 
-            $dataBarang = $this->barangModel->find($id_barang);
-
-            if (!$dataBarang) {
-                return redirect()->back()
-                    ->withInput()
-                    ->with('error', 'Barang tidak ditemukan.');
-            }
-
-            // Cek stok
-            if ($jumlah > $dataBarang['stok']) {
-                return redirect()->back()
-                    ->withInput()
-                    ->with(
-                        'error',
-                        'Stok ' . $dataBarang['nama_barang'] .
-                        ' tidak mencukupi. Stok tersedia: ' .
-                        $dataBarang['stok']
-                    );
-            }
-
-            $harga = (float) $dataBarang['harga_jual'];
-            $subtotal = $harga * $jumlah;
-
+            $harga = (float) $barang['harga_jual'];
+            $hargaModal = (float) $barang['harga_beli'];
+            $subtotal = $harga * $qty;
             $total += $subtotal;
-
-            $items[] = [
-                'id_barang' => $id_barang,
-                'qty' => $jumlah,
-                'harga' => $harga,
-                'subtotal' => $subtotal
-            ];
+            $items[] = compact('idBarang', 'qty', 'harga', 'hargaModal', 'subtotal', 'barang');
         }
 
-        if (empty($items)) {
-            return redirect()->back()
-                ->withInput()
-                ->with('error', 'Minimal harus ada satu barang.');
+        if ($metode !== 'Tunai') {
+            // Pembayaran non-tunai dianggap lunas sesuai total transaksi.
+            $bayar = $total;
+        } elseif ($bayar < $total) {
+            return redirect()->back()->withInput()->with('error', 'Pembayaran kurang. Total Rp ' . number_format($total, 0, ',', '.') . '.');
         }
 
-        // ==========================================
-        // VALIDASI PEMBAYARAN
-        // ==========================================
-        $bayar = (float) $bayar;
-
-        if ($bayar < $total) {
-            return redirect()->back()
-                ->withInput()
-                ->with(
-                    'error',
-                    'Uang pembayaran kurang. Total transaksi Rp ' .
-                    number_format($total, 0, ',', '.')
-                );
-        }
-
-        $kembalian = $bayar - $total;
-
-        // ==========================================
-        // NOMOR TRANSAKSI
-        // ==========================================
-        $noTransaksi = 'TRX-' . date('YmdHis');
-
-        // ==========================================
-        // DATABASE TRANSACTION
-        // ==========================================
         $db = \Config\Database::connect();
-
         $db->transBegin();
 
         try {
-
-            // -------------------------------
-            // SIMPAN PENJUALAN
-            // -------------------------------
+            $noTransaksi = 'TRX-' . date('YmdHis') . '-' . random_int(10, 99);
             $this->penjualanModel->insert([
                 'no_transaksi' => $noTransaksi,
                 'tanggal' => date('Y-m-d H:i:s'),
-                'id_customer' => !empty($customer) ? $customer : null,
-                'id_user' => session()->get('id_user'),
+                'id_customer' => !empty($customer) ? (int) $customer : null,
+                'id_user' => (int) session()->get('id_user'),
                 'total' => $total,
+                'metode_pembayaran' => $metode,
                 'bayar' => $bayar,
-                'kembalian' => $kembalian
+                'kembalian' => $bayar - $total,
             ]);
-
             $idPenjualan = $this->penjualanModel->getInsertID();
 
-            // -------------------------------
-            // SIMPAN DETAIL + KURANGI STOK
-            // -------------------------------
             foreach ($items as $item) {
+                // Baca stok ulang di dalam transaksi sebelum update.
+                $current = $this->barangModel->find($item['idBarang']);
+                $stokSebelum = (int) $current['stok'];
+                if ($item['qty'] > $stokSebelum) {
+                    throw new \RuntimeException('Stok berubah saat transaksi diproses.');
+                }
+                $stokSesudah = $stokSebelum - $item['qty'];
 
                 $this->detailModel->insert([
                     'id_penjualan' => $idPenjualan,
-                    'id_barang' => $item['id_barang'],
+                    'id_barang' => $item['idBarang'],
                     'qty' => $item['qty'],
                     'harga' => $item['harga'],
-                    'subtotal' => $item['subtotal']
+                    'harga_modal' => $item['hargaModal'],
+                    'subtotal' => $item['subtotal'],
                 ]);
 
-                // Kurangi stok
-                $this->barangModel
-                    ->set(
-                        'stok',
-                        'stok - ' . $item['qty'],
-                        false
-                    )
-                    ->where('id_barang', $item['id_barang'])
-                    ->update();
+                $this->barangModel->update($item['idBarang'], ['stok' => $stokSesudah]);
+                $this->mutasiModel->insert([
+                    'id_barang' => $item['idBarang'],
+                    'id_user' => (int) session()->get('id_user'),
+                    'tipe' => 'KELUAR',
+                    'qty' => $item['qty'],
+                    'stok_sebelum' => $stokSebelum,
+                    'stok_sesudah' => $stokSesudah,
+                    'referensi_tipe' => 'PENJUALAN',
+                    'referensi_id' => $idPenjualan,
+                    'keterangan' => 'Penjualan ' . $noTransaksi,
+                ]);
             }
 
-            // ==========================================
-            // CEK TRANSACTION
-            // ==========================================
             if ($db->transStatus() === false) {
-                $db->transRollback();
-
-                return redirect()->back()
-                    ->withInput()
-                    ->with('error', 'Transaksi gagal disimpan.');
+                throw new \RuntimeException('Database transaction failed');
             }
-
             $db->transCommit();
-
-            return redirect()->to(
-                '/penjualan/sukses/' . $idPenjualan
-            )->with(
-                'success',
-                'Transaksi berhasil disimpan.'
-            );
-
+            return redirect()->to('/penjualan/sukses/' . $idPenjualan)->with('success', 'Transaksi berhasil disimpan.');
         } catch (\Throwable $e) {
-
             $db->transRollback();
-
-            return redirect()->back()
-                ->withInput()
-                ->with(
-                    'error',
-                    'Terjadi kesalahan saat menyimpan transaksi.'
-                );
+            log_message('error', 'Gagal menyimpan penjualan: {message}', ['message' => $e->getMessage()]);
+            return redirect()->back()->withInput()->with('error', 'Transaksi gagal disimpan. Silakan cek stok dan coba lagi.');
         }
     }
 
-    // ==========================================
-    // HALAMAN SUKSES
-    // ==========================================
     public function sukses($id)
     {
-        if (!session()->get('logged_in')) {
-            return redirect()->to('/login');
-        }
-
         $penjualan = $this->penjualanModel
             ->select('penjualan.*, customer.nama_customer, users.nama_lengkap')
-            ->join(
-                'customer',
-                'customer.id_customer = penjualan.id_customer',
-                'left'
-            )
-            ->join(
-                'users',
-                'users.id_user = penjualan.id_user'
-            )
+            ->join('customer', 'customer.id_customer = penjualan.id_customer', 'left')
+            ->join('users', 'users.id_user = penjualan.id_user')
             ->where('penjualan.id_penjualan', $id)
             ->first();
 
         if (!$penjualan) {
-            return redirect()->to('/penjualan')
-                ->with('error', 'Transaksi tidak ditemukan.');
+            return redirect()->to('/penjualan/riwayat')->with('error', 'Transaksi tidak ditemukan.');
         }
 
         $detail = $this->detailModel
-            ->select(
-                'detail_penjualan.*, barang.kode_barang, barang.nama_barang, barang.satuan'
-            )
-            ->join(
-                'barang',
-                'barang.id_barang = detail_penjualan.id_barang'
-            )
-            ->where(
-                'detail_penjualan.id_penjualan',
-                $id
-            )
+            ->select('detail_penjualan.*, barang.kode_barang, barang.nama_barang, barang.satuan')
+            ->join('barang', 'barang.id_barang = detail_penjualan.id_barang')
+            ->where('detail_penjualan.id_penjualan', $id)
             ->findAll();
 
-        $data = [
-            'title' => 'Transaksi Berhasil',
+        return view('penjualan/sukses', [
+            'title' => 'Detail Transaksi',
             'penjualan' => $penjualan,
-            'detail' => $detail
-        ];
-
-        return view('penjualan/sukses', $data);
+            'detail' => $detail,
+        ]);
     }
 
-    // ==========================================
-// RIWAYAT TRANSAKSI
-// ==========================================
-public function riwayat()
-{
-    if (!session()->get('logged_in')) {
-        return redirect()->to('/login');
+    public function riwayat()
+    {
+        $keyword = trim((string) $this->request->getGet('keyword'));
+        $builder = $this->penjualanModel
+            ->select('penjualan.*, customer.nama_customer, users.nama_lengkap')
+            ->join('customer', 'customer.id_customer = penjualan.id_customer', 'left')
+            ->join('users', 'users.id_user = penjualan.id_user', 'left');
+
+        if ($keyword !== '') {
+            $builder->groupStart()
+                ->like('penjualan.no_transaksi', $keyword)
+                ->orLike('customer.nama_customer', $keyword)
+                ->orLike('users.nama_lengkap', $keyword)
+                ->groupEnd();
+        }
+
+        return view('penjualan/riwayat', [
+            'title' => 'Riwayat Penjualan',
+            'penjualan' => $builder->orderBy('penjualan.id_penjualan', 'DESC')->findAll(),
+            'keyword' => $keyword,
+        ]);
     }
 
-    $keyword = $this->request->getGet('keyword');
+    public function laporan()
+    {
+        $tanggalMulai = $this->request->getGet('tanggal_mulai');
+        $tanggalAkhir = $this->request->getGet('tanggal_akhir');
+        $builder = $this->penjualanModel
+            ->select('penjualan.*, customer.nama_customer, users.nama_lengkap')
+            ->join('customer', 'customer.id_customer = penjualan.id_customer', 'left')
+            ->join('users', 'users.id_user = penjualan.id_user', 'left');
 
-    $builder = $this->penjualanModel
-        ->select('
-            penjualan.*,
-            customer.nama_customer,
-            users.nama_lengkap
-        ')
-        ->join(
-            'customer',
-            'customer.id_customer = penjualan.id_customer',
-            'left'
-        )
-        ->join(
-            'users',
-            'users.id_user = penjualan.id_user',
-            'left'
-        );
+        if ($tanggalMulai) {
+            $builder->where('DATE(penjualan.tanggal) >=', $tanggalMulai);
+        }
+        if ($tanggalAkhir) {
+            $builder->where('DATE(penjualan.tanggal) <=', $tanggalAkhir);
+        }
 
-    if ($keyword) {
-        $builder->groupStart()
-            ->like('penjualan.no_transaksi', $keyword)
-            ->orLike('customer.nama_customer', $keyword)
-            ->orLike('users.nama_lengkap', $keyword)
-            ->groupEnd();
-    }
+        $rows = $builder->orderBy('penjualan.tanggal', 'DESC')->findAll();
+        $total = array_sum(array_map(static fn($row) => (float) $row['total'], $rows));
 
-    $data = [
-        'title' => 'Riwayat Transaksi',
-        'penjualan' => $builder
-            ->orderBy('penjualan.id_penjualan', 'DESC')
-            ->findAll(),
-        'keyword' => $keyword
-    ];
-
-    return view('penjualan/riwayat', $data);
-  }
-
-  // ==========================================
-// LAPORAN PENJUALAN
-// ==========================================
-public function laporan()
-{
-    if (!session()->get('logged_in')) {
-        return redirect()->to('/login');
-    }
-
-    $tanggalMulai = $this->request->getGet('tanggal_mulai');
-    $tanggalAkhir = $this->request->getGet('tanggal_akhir');
-
-    $builder = $this->penjualanModel
-        ->select('
-            penjualan.*,
-            customer.nama_customer,
-            users.nama_lengkap
-        ')
-        ->join(
-            'customer',
-            'customer.id_customer = penjualan.id_customer',
-            'left'
-        )
-        ->join(
-            'users',
-            'users.id_user = penjualan.id_user',
-            'left'
-        );
-
-    // Filter tanggal
-    if (!empty($tanggalMulai)) {
-        $builder->where(
-            'DATE(penjualan.tanggal) >=',
-            $tanggalMulai
-        );
-    }
-
-    if (!empty($tanggalAkhir)) {
-        $builder->where(
-            'DATE(penjualan.tanggal) <=',
-            $tanggalAkhir
-        );
-    }
-
-    $dataPenjualan = $builder
-        ->orderBy('penjualan.tanggal', 'DESC')
-        ->findAll();
-
-    // Hitung total
-    $totalPenjualan = 0;
-
-    foreach ($dataPenjualan as $row) {
-        $totalPenjualan += (float) $row['total'];
-    }
-
-    $data = [
-        'title' => 'Laporan Penjualan',
-        'penjualan' => $dataPenjualan,
-        'tanggalMulai' => $tanggalMulai,
-        'tanggalAkhir' => $tanggalAkhir,
-        'totalTransaksi' => count($dataPenjualan),
-        'totalPenjualan' => $totalPenjualan
-    ];
-
-    return view('laporan/penjualan', $data);
+        return view('laporan/penjualan', [
+            'title' => 'Laporan Penjualan',
+            'penjualan' => $rows,
+            'tanggalMulai' => $tanggalMulai,
+            'tanggalAkhir' => $tanggalAkhir,
+            'totalTransaksi' => count($rows),
+            'totalPenjualan' => $total,
+        ]);
     }
 }

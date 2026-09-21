@@ -325,14 +325,10 @@
 
                                         </a>
 
-                                        <a href="<?= base_url('/customer/hapus/' . $row['id_customer']) ?>"
-                                           class="btn btn-outline-danger btn-sm"
-                                           title="Hapus Customer"
-                                           onclick="return confirm('Yakin ingin menghapus customer ini?')">
-
-                                            <i class="bi bi-trash"></i>
-
-                                        </a>
+                                        <form method="post" action="<?= base_url('/customer/hapus/' . $row['id_customer']) ?>" class="d-inline" onsubmit="return confirm('Yakin ingin menghapus customer ini?')">
+                                            <?= csrf_field() ?>
+                                            <button class="btn btn-outline-danger btn-sm" title="Hapus Customer"><i class="bi bi-trash"></i></button>
+                                        </form>
 
                                     </div>
 

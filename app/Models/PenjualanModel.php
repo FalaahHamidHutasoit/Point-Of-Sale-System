@@ -15,6 +15,7 @@ class PenjualanModel extends Model
         'id_customer',
         'id_user',
         'total',
+        'metode_pembayaran',
         'bayar',
         'kembalian'
     ];

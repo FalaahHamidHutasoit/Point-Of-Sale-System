@@ -230,14 +230,10 @@
                                         </a>
 
 
-                                        <a href="<?= base_url('/kategori/hapus/' . $row['id_kategori']) ?>"
-                                           class="btn btn-outline-danger btn-sm action-btn"
-                                           title="Hapus kategori"
-                                           onclick="return confirm('Yakin ingin menghapus kategori ini?')">
-
-                                            <i class="bi bi-trash"></i>
-
-                                        </a>
+                                        <form method="post" action="<?= base_url('/kategori/hapus/' . $row['id_kategori']) ?>" class="d-inline" onsubmit="return confirm('Yakin ingin menghapus kategori ini?')">
+                                            <?= csrf_field() ?>
+                                            <button class="btn btn-outline-danger btn-sm action-btn" title="Hapus kategori"><i class="bi bi-trash"></i></button>
+                                        </form>
 
                                     </div>
 

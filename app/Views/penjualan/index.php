@@ -226,8 +226,10 @@
                         Metode pembayaran
                     </label>
 
-                    <select class="form-select checkout-input" name="metode_pembayaran">
+                    <select class="form-select checkout-input" name="metode_pembayaran" id="metodePembayaran">
                         <option value="Tunai">Tunai</option>
+                        <option value="QRIS">QRIS</option>
+                        <option value="Transfer">Transfer</option>
                     </select>
 
                     <label class="checkout-label mt-3">
@@ -1291,6 +1293,23 @@ document.getElementById('inputBayar').addEventListener(
     'input',
     hitungKembalian
 );
+
+const metodePembayaran = document.getElementById('metodePembayaran');
+metodePembayaran.addEventListener('change', function () {
+    const bayarInput = document.getElementById('inputBayar');
+    if (this.value !== 'Tunai') {
+        let total = 0;
+        keranjang.forEach(item => total += item.harga * item.qty);
+        bayarInput.value = total || '';
+        bayarInput.readOnly = true;
+        bayarInput.placeholder = 'Nominal mengikuti total';
+    } else {
+        bayarInput.readOnly = false;
+        bayarInput.value = '';
+        bayarInput.placeholder = 'Masukkan nominal tunai';
+    }
+    hitungKembalian();
+});
 
 function hitungKembalian() {
 

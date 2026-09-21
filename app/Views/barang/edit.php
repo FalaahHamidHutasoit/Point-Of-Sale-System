@@ -215,37 +215,15 @@
                         </div>
 
                     </div>
-
-
                     <!-- STOK -->
                     <div class="col-md-6">
-
-                        <label class="form-label fw-semibold">
-                            Stok
-                        </label>
-
+                        <label class="form-label fw-semibold">Stok Saat Ini</label>
                         <div class="input-group">
-
-                            <span class="input-group-text bg-light">
-                                <i class="bi bi-stack"></i>
-                            </span>
-
-                            <input type="number"
-                                   name="stok"
-                                   class="form-control"
-                                   min="0"
-                                   placeholder="0"
-                                   value="<?= old('stok', $barang['stok']) ?>"
-                                   required>
-
+                            <span class="input-group-text bg-light"><i class="bi bi-stack"></i></span>
+                            <input type="text" class="form-control" value="<?= esc($barang['stok']) ?> <?= esc($barang['satuan']) ?>" readonly>
                         </div>
-
-                        <small class="text-muted">
-                            Jumlah stok barang saat ini.
-                        </small>
-
+                        <small class="text-muted">Stok tidak diubah dari form edit. Gunakan menu <a href="<?= base_url('pembelian/tambah') ?>">Pembelian / Restock</a> agar perubahan tercatat.</small>
                     </div>
-
 
                     <!-- SATUAN -->
                     <div class="col-md-6">
