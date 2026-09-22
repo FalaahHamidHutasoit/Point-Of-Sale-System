@@ -55,8 +55,27 @@ class Penjualan extends BaseController
         $bayar = (float) $this->request->getPost('bayar');
         $metode = trim((string) $this->request->getPost('metode_pembayaran')) ?: 'Tunai';
 
-        if (!in_array($metode, ['Tunai', 'QRIS', 'Transfer'], true)) {
-            return redirect()->back()->withInput()->with('error', 'Metode pembayaran tidak valid.');
+        // Phase 14: endpoint /penjualan/simpan hanya untuk pembayaran Tunai.
+        // QRIS/Transfer wajib melalui prepare -> token/reference -> confirm agar tidak
+        // dapat melewati lifecycle PENDING/PAID hanya dengan POST manual ke endpoint ini.
+        if ($metode !== 'Tunai') {
+            $this->auditEvent(
+                'PAYMENT_FLOW_BYPASS_BLOCKED',
+                'SECURITY',
+                (int) session()->get('id_user'),
+                (string) session()->get('username'),
+                'Percobaan menyimpan transaksi non-tunai melalui endpoint tunai diblokir.',
+                ['requested_method' => $metode],
+                ['required_flow' => $metode === 'QRIS' ? 'QR_DEMO' : ($metode === 'Transfer' ? 'TRANSFER_DEMO' : 'UNKNOWN')],
+                'BLOCKED'
+            );
+
+            return redirect()->back()->withInput()->with(
+                'error',
+                in_array($metode, ['QRIS', 'Transfer'], true)
+                    ? 'Pembayaran ' . $metode . ' harus diselesaikan melalui alur verifikasi pembayaran.'
+                    : 'Metode pembayaran tidak valid.'
+            );
         }
 
         if (!is_array($barangIds) || !is_array($qtys)) {
@@ -525,7 +544,10 @@ class Penjualan extends BaseController
                 $this->auditEvent('PAYMENT_FAILED', 'DEMO_PAYMENT', (int) $failedPayment['id_demo_payment'], $failedPayment['payment_reference'] ?? 'QR Payment Demo',
                     'Pembayaran QR demo gagal diproses.', ['status' => 'PENDING'], ['status' => 'FAILED', 'reason' => $e->getMessage()], 'FAILED', $this->paymentActor($failedPayment));
             }
-            return view('penjualan/demo_payment_result', ['ok' => false, 'message' => $e->getMessage()]);
+            return view('penjualan/demo_payment_result', [
+                'ok' => false,
+                'message' => 'Pembayaran demo tidak dapat diselesaikan. Silakan kembali ke kasir dan buat instruksi pembayaran baru.',
+            ]);
         }
     }
 
@@ -900,7 +922,7 @@ class Penjualan extends BaseController
             }
             return view('penjualan/demo_bank_result', [
                 'ok' => false,
-                'message' => $e->getMessage(),
+                'message' => 'Transfer demo tidak dapat diselesaikan. Silakan kembali ke kasir dan buat instruksi transfer baru.',
                 'payment' => $failedPayment ?? null,
             ]);
         }

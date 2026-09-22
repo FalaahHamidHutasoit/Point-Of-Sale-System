@@ -43,12 +43,24 @@ class KamelaSecurityHeaders implements FilterInterface
             "font-src 'self' data: https://cdn.jsdelivr.net https://fonts.gstatic.com"
         );
 
-        // Halaman authenticated tidak boleh disimpan browser/proxy cache.
-        // Ini mengurangi risiko halaman sensitif masih terlihat lewat tombol Back setelah logout.
-        if (session()->get('logged_in')) {
+        // Halaman authenticated dan halaman payment demo bertoken tidak boleh
+        // disimpan browser/proxy cache. Public payment page membawa token sekali pakai
+        // pada URL sehingga histori/cache browser tidak perlu menyimpan responsnya.
+        $path = trim($request->getUri()->getPath(), '/');
+        $isPaymentDemo = str_starts_with($path, 'payment/demo/')
+            || str_starts_with($path, 'demo-bank/pay/');
+
+        if (session()->get('logged_in') || $isPaymentDemo) {
             $response->setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0, private');
             $response->setHeader('Pragma', 'no-cache');
             $response->setHeader('Expires', '0');
+        }
+
+        if ($isPaymentDemo) {
+            // Token payment ada di path URL. Jangan kirim URL bertoken sebagai Referer
+            // ke asset/request lain dan jangan izinkan halaman demo terindeks mesin pencari.
+            $response->setHeader('Referrer-Policy', 'no-referrer');
+            $response->setHeader('X-Robots-Tag', 'noindex, nofollow, noarchive');
         }
 
         // HSTS hanya dikirim saat request benar-benar HTTPS agar localhost HTTP tidak terkunci.

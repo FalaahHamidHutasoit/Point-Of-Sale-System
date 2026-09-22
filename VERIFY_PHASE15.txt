@@ -1,0 +1,27 @@
+PHASE 15 STATIC VERIFICATION
+============================
+Canonical DB: KAMELA_FULL_RESET.sql
+Expected tables: 16
+Expected fresh-import row intent:
+- users: 6
+- kategori: 7
+- barang: 50
+- customer: 25
+- supplier: 10
+- penjualan: 290
+- pembelian: 34
+- penerimaan_barang: non-empty
+- detail_penerimaan_barang: non-empty
+- demo_payments: 8
+- audit_logs: 12
+- stock_opname: 3
+- stock_opname_detail: 10
+- mutasi_stok: non-empty
+
+Decision-support anchors:
+- PO-DEMO-OVERDUE
+- PO-DEMO-PARTIAL
+- KML005 / KML012 / KML027 / KML039 low stock + current demand
+- previous-period sales generated relative to CURDATE()
+
+No active Stock Opname DRAFT is seeded.

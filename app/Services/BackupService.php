@@ -13,31 +13,39 @@ use RuntimeException;
  */
 class BackupService
 {
-    private const FORMAT = 'KAMELA_BACKUP_V1';
+    private const FORMAT = 'KAMELA_BACKUP_V2';
 
     /** @var list<string> */
     private const TABLES = [
+        // Parent/master tables first so restore inserts respect FK dependencies.
         'users',
         'kategori',
         'customer',
         'supplier',
         'barang',
-        'stock_opname',
-        'stock_opname_detail',
         'penjualan',
         'detail_penjualan',
         'pembelian',
         'detail_pembelian',
+        'penerimaan_barang',
+        'detail_penerimaan_barang',
         'mutasi_stok',
+        'demo_payments',
+        'stock_opname',
+        'stock_opname_detail',
         'audit_logs',
     ];
 
     /** @var list<string> */
     private const DELETE_ORDER = [
+        // Reverse dependency order so a current-schema restore starts from a clean snapshot.
         'audit_logs',
+        'demo_payments',
         'stock_opname_detail',
         'stock_opname',
         'mutasi_stok',
+        'detail_penerimaan_barang',
+        'penerimaan_barang',
         'detail_pembelian',
         'pembelian',
         'detail_penjualan',
@@ -69,8 +77,10 @@ class BackupService
 
         foreach (self::TABLES as $table) {
             if (!$this->db->tableExists($table)) {
-                // Phase backup harus tetap bisa dibuat sebelum module optional terpasang.
-                continue;
+                throw new RuntimeException(
+                    'Schema database KAMELA belum lengkap. Tabel tidak ditemukan: ' . $table .
+                    '. Sinkronkan database sebelum membuat backup.'
+                );
             }
 
             $rows = $this->db->table($table)->get()->getResultArray();
@@ -195,6 +205,23 @@ class BackupService
             }
         }
 
+        // Snapshot harus lengkap untuk semua tabel KAMELA yang ada pada schema saat ini.
+        // Ini sengaja menolak backup lama/parsial agar restore tidak mengosongkan tabel
+        // baru (mis. pembayaran demo atau penerimaan barang) tanpa mengembalikannya.
+        foreach (self::TABLES as $table) {
+            if (!$this->db->tableExists($table)) {
+                throw new RuntimeException(
+                    'Schema database KAMELA saat ini tidak lengkap. Tabel tidak ditemukan: ' . $table . '.'
+                );
+            }
+            if (!array_key_exists($table, $tables)) {
+                throw new RuntimeException(
+                    'Backup tidak lengkap untuk schema KAMELA saat ini. Tabel hilang: ' . $table .
+                    '. Buat backup baru dari versi aplikasi terbaru.'
+                );
+            }
+        }
+
         $restoredTables = 0;
         $restoredRows = 0;
 
@@ -299,6 +326,16 @@ class BackupService
         $expected = hash('sha256', $this->encode($payload));
         if (!hash_equals((string) $document['checksum'], $expected)) {
             throw new RuntimeException('Checksum backup tidak cocok. File mungkin rusak atau diubah.');
+        }
+
+        $tables = $payload['tables'] ?? null;
+        if (!is_array($tables)) {
+            throw new RuntimeException('Payload backup tidak memiliki data tabel yang valid.');
+        }
+        foreach (self::TABLES as $table) {
+            if (!array_key_exists($table, $tables) || !is_array($tables[$table])) {
+                throw new RuntimeException('Backup tidak lengkap untuk format V2. Tabel hilang/tidak valid: ' . $table . '.');
+            }
         }
 
         return [

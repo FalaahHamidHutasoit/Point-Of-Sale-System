@@ -1,7 +1,7 @@
 -- ============================================================================
--- KAMELA - FINAL DATABASE RESET + DEMO SEED
--- Final consolidated schema after Security/Foundation Phase 1-6
--- Generated: 2026-09-21
+-- KAMELA - PHASE 15 FINAL FULL RESET + COMPLETE DEMO SEED
+-- Consolidated schema synchronized through Phase 14 - Operational Hardening & QA
+-- Generated: 2026-09-22
 --
 -- THIS FILE IS DESTRUCTIVE.
 -- It drops and recreates every KAMELA application table in database `pos_ci4`.
@@ -9,16 +9,22 @@
 -- BACK UP any important database before importing.
 --
 -- Included foundation:
---   * Base POS + purchasing + stock mutation
---   * Phase 2 authorization/data-integrity DB constraints
---   * Phase 3 audit_logs
---   * Phase 5 controlled stock_opname tables
---   * Phase 4 backup/recovery and Phase 6 production hardening are application-level
---     features and therefore require no extra database tables.
+--   * Base POS + purchase order + goods receiving + stock mutation
+--   * Role architecture: Admin, Kasir, Gudang, Purchasing, Manager
+--   * Audit trail + user/employee management data
+--   * Controlled stock opname with finalized/cancelled history
+--   * QR/Transfer payment simulation history, PO statuses, receiving history
+--   * Decision-support-ready seed: low stock, restock indicators, slow movers, overdue PO
 --
 -- Demo accounts after import:
---   Admin : admin / admin123
---   Kasir : kasir / kasir123
+--   Admin      : admin / admin123
+--   Kasir      : kasir / kasir123
+--   Gudang     : gudang / gudang123
+--   Purchasing : purchasing / purchasing123
+--   Manager    : manager / manager123
+--   Gudang: gudang / gudang123
+--   Purchasing: purchasing / purchasing123
+--   Manager: manager / manager123
 -- ============================================================================
 
 CREATE DATABASE IF NOT EXISTS `pos_ci4`
@@ -37,6 +43,8 @@ DROP TABLE IF EXISTS `audit_logs`;
 DROP TABLE IF EXISTS `stock_opname_detail`;
 DROP TABLE IF EXISTS `stock_opname`;
 DROP TABLE IF EXISTS `mutasi_stok`;
+DROP TABLE IF EXISTS `detail_penerimaan_barang`;
+DROP TABLE IF EXISTS `penerimaan_barang`;
 DROP TABLE IF EXISTS `detail_pembelian`;
 DROP TABLE IF EXISTS `pembelian`;
 DROP TABLE IF EXISTS `demo_payments`;
@@ -53,13 +61,25 @@ DROP TABLE IF EXISTS `users`;
 -- ----------------------------------------------------------------------------
 CREATE TABLE `users` (
   `id_user` INT NOT NULL AUTO_INCREMENT,
+  `kode_pegawai` VARCHAR(20) NOT NULL,
   `username` VARCHAR(50) NOT NULL,
   `password` VARCHAR(255) NOT NULL,
   `nama_lengkap` VARCHAR(100) NOT NULL,
-  `role` ENUM('admin','kasir') NOT NULL DEFAULT 'kasir',
+  `email` VARCHAR(120) DEFAULT NULL,
+  `no_telp` VARCHAR(20) DEFAULT NULL,
+  `tanggal_masuk` DATE DEFAULT NULL,
+  `role` ENUM('admin','kasir','gudang','purchasing','manager') NOT NULL DEFAULT 'kasir',
+  `is_active` TINYINT(1) NOT NULL DEFAULT 1,
+  `must_change_password` TINYINT(1) NOT NULL DEFAULT 0,
+  `password_changed_at` DATETIME DEFAULT NULL,
+  `last_login_at` DATETIME DEFAULT NULL,
   `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id_user`),
-  UNIQUE KEY `uk_users_username` (`username`)
+  UNIQUE KEY `uk_users_kode_pegawai` (`kode_pegawai`),
+  UNIQUE KEY `uk_users_username` (`username`),
+  UNIQUE KEY `uk_users_email` (`email`),
+  KEY `idx_users_role_active` (`role`,`is_active`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 CREATE TABLE `kategori` (
@@ -160,16 +180,22 @@ CREATE TABLE `pembelian` (
   `id_pembelian` INT NOT NULL AUTO_INCREMENT,
   `no_pembelian` VARCHAR(30) NOT NULL,
   `tanggal` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `tanggal_target` DATE DEFAULT NULL,
   `id_supplier` INT NOT NULL,
   `id_user` INT NOT NULL,
   `total` DECIMAL(15,2) NOT NULL DEFAULT 0.00,
   `catatan` VARCHAR(255) DEFAULT NULL,
+  `status` ENUM('DRAFT','DIORDER','SEBAGIAN','DITERIMA','DIBATALKAN') NOT NULL DEFAULT 'DITERIMA',
+  `ordered_at` DATETIME DEFAULT NULL,
+  `cancelled_at` DATETIME DEFAULT NULL,
   `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id_pembelian`),
   UNIQUE KEY `uk_pembelian_no` (`no_pembelian`),
   KEY `idx_pembelian_supplier` (`id_supplier`),
   KEY `idx_pembelian_user` (`id_user`),
   KEY `idx_pembelian_tanggal` (`tanggal`),
+  KEY `idx_pembelian_status` (`status`),
+  KEY `idx_pembelian_target` (`tanggal_target`),
   CONSTRAINT `fk_pembelian_supplier`
     FOREIGN KEY (`id_supplier`) REFERENCES `supplier` (`id_supplier`)
     ON DELETE RESTRICT ON UPDATE CASCADE,
@@ -183,6 +209,7 @@ CREATE TABLE `detail_pembelian` (
   `id_pembelian` INT NOT NULL,
   `id_barang` INT NOT NULL,
   `qty` INT NOT NULL,
+  `qty_diterima` INT NOT NULL DEFAULT 0,
   `harga_beli` DECIMAL(15,2) NOT NULL,
   `subtotal` DECIMAL(15,2) NOT NULL,
   PRIMARY KEY (`id_detail_pembelian`),
@@ -194,6 +221,41 @@ CREATE TABLE `detail_pembelian` (
   CONSTRAINT `fk_detail_pembelian_barang`
     FOREIGN KEY (`id_barang`) REFERENCES `barang` (`id_barang`)
     ON DELETE RESTRICT ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+CREATE TABLE `penerimaan_barang` (
+  `id_penerimaan` INT NOT NULL AUTO_INCREMENT,
+  `no_penerimaan` VARCHAR(35) NOT NULL,
+  `id_pembelian` INT NOT NULL,
+  `id_user` INT NOT NULL,
+  `tanggal` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `no_surat_jalan` VARCHAR(60) DEFAULT NULL,
+  `catatan` VARCHAR(255) DEFAULT NULL,
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id_penerimaan`),
+  UNIQUE KEY `uk_penerimaan_no` (`no_penerimaan`),
+  KEY `idx_penerimaan_po` (`id_pembelian`),
+  KEY `idx_penerimaan_user` (`id_user`),
+  KEY `idx_penerimaan_tanggal` (`tanggal`),
+  CONSTRAINT `fk_penerimaan_po` FOREIGN KEY (`id_pembelian`) REFERENCES `pembelian` (`id_pembelian`) ON DELETE RESTRICT ON UPDATE CASCADE,
+  CONSTRAINT `fk_penerimaan_user` FOREIGN KEY (`id_user`) REFERENCES `users` (`id_user`) ON DELETE RESTRICT ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+CREATE TABLE `detail_penerimaan_barang` (
+  `id_detail_penerimaan` INT NOT NULL AUTO_INCREMENT,
+  `id_penerimaan` INT NOT NULL,
+  `id_detail_pembelian` INT NOT NULL,
+  `id_barang` INT NOT NULL,
+  `qty_diterima` INT NOT NULL,
+  `harga_beli` DECIMAL(15,2) NOT NULL,
+  `subtotal` DECIMAL(15,2) NOT NULL,
+  PRIMARY KEY (`id_detail_penerimaan`),
+  KEY `idx_detail_penerimaan_header` (`id_penerimaan`),
+  KEY `idx_detail_penerimaan_po_detail` (`id_detail_pembelian`),
+  KEY `idx_detail_penerimaan_barang` (`id_barang`),
+  CONSTRAINT `fk_detail_penerimaan_header` FOREIGN KEY (`id_penerimaan`) REFERENCES `penerimaan_barang` (`id_penerimaan`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `fk_detail_penerimaan_po_detail` FOREIGN KEY (`id_detail_pembelian`) REFERENCES `detail_pembelian` (`id_detail_pembelian`) ON DELETE RESTRICT ON UPDATE CASCADE,
+  CONSTRAINT `fk_detail_penerimaan_barang` FOREIGN KEY (`id_barang`) REFERENCES `barang` (`id_barang`) ON DELETE RESTRICT ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 CREATE TABLE `mutasi_stok` (
@@ -347,9 +409,20 @@ INSERT INTO `kategori` (`nama_kategori`) SELECT 'Kebutuhan Rumah' WHERE NOT EXIS
 INSERT INTO `kategori` (`nama_kategori`) SELECT 'ATK' WHERE NOT EXISTS (SELECT 1 FROM `kategori` WHERE `nama_kategori`='ATK' LIMIT 1);
 
 -- User demo
-INSERT INTO `users` (`id_user`,`username`,`password`,`nama_lengkap`,`role`,`created_at`) VALUES
-(1,'admin','$2y$10$L1l0bGO6HfXHoKWK..zNEuGlyR5Ias4LEXMMGFZxe4kLFcBwD8p/C','Administrator KAMELA','admin','2024-01-01 08:00:00'),
-(2,'kasir','$2y$12$pcGZtR2ksBC0LYwE7Jqjk.GLP1gEBXEc7WveaL64Qv3XRRfbtx5ZK','Kasir Utama','kasir','2024-01-01 08:05:00');
+INSERT INTO `users` (`id_user`,`kode_pegawai`,`username`,`password`,`nama_lengkap`,`email`,`no_telp`,`tanggal_masuk`,`role`,`is_active`,`must_change_password`,`password_changed_at`,`last_login_at`,`created_at`) VALUES
+(1,'ADM001','admin','$2y$10$L1l0bGO6HfXHoKWK..zNEuGlyR5Ias4LEXMMGFZxe4kLFcBwD8p/C','Administrator KAMELA','admin@kamela.local',NULL,'2024-01-01','admin',1,0,NULL,NULL,'2024-01-01 08:00:00'),
+(2,'KSR001','kasir','$2y$12$pcGZtR2ksBC0LYwE7Jqjk.GLP1gEBXEc7WveaL64Qv3XRRfbtx5ZK','Kasir Utama','kasir@kamela.local',NULL,'2024-01-01','kasir',1,0,NULL,NULL,'2024-01-01 08:05:00'),
+(3,'GDG001','gudang','$2y$12$E0liinXxhndIFl1cosjVee4dprSunebkUWs1X3RoFXG8mZjv..8.2','Staf Gudang KAMELA','gudang@kamela.local',NULL,'2024-01-01','gudang',1,0,NULL,NULL,'2024-01-01 08:10:00'),
+(4,'MGR001','manager','$2y$12$JuSa8SZiKV8ACYJQBi5iZecEE1ohvFLKB/C4hfLH0jG.dSzNgOJwm','Manager KAMELA','manager@kamela.local',NULL,'2024-01-01','manager',1,0,NULL,NULL,'2024-01-01 08:15:00'),
+(5,'PCH001','purchasing','$2y$12$B1LwxjLVkDga9TpAVcJvvufrOOvAT74M4Ce/TRbAqNEPytK9JVJEi','Purchasing KAMELA','purchasing@kamela.local',NULL,'2024-01-01','purchasing',1,0,NULL,NULL,'2024-01-01 08:20:00'),
+(6,'KSR002','kasir.demo','$2y$12$pcGZtR2ksBC0LYwE7Jqjk.GLP1gEBXEc7WveaL64Qv3XRRfbtx5ZK','Kasir Cadangan','kasir.demo@kamela.local','081234567806','2025-07-01','kasir',0,0,'2025-07-01 09:00:00',NULL,'2025-07-01 09:00:00');
+-- Phase 15 employee demo polish: realistic contact and login metadata.
+UPDATE `users` SET `no_telp`='081234567801', `last_login_at`=DATE_SUB(NOW(), INTERVAL 25 MINUTE) WHERE `id_user`=1;
+UPDATE `users` SET `no_telp`='081234567802', `last_login_at`=DATE_SUB(NOW(), INTERVAL 10 MINUTE) WHERE `id_user`=2;
+UPDATE `users` SET `no_telp`='081234567803', `last_login_at`=DATE_SUB(NOW(), INTERVAL 2 HOUR) WHERE `id_user`=3;
+UPDATE `users` SET `no_telp`='081234567804', `last_login_at`=DATE_SUB(NOW(), INTERVAL 45 MINUTE) WHERE `id_user`=4;
+UPDATE `users` SET `no_telp`='081234567805', `last_login_at`=DATE_SUB(NOW(), INTERVAL 90 MINUTE) WHERE `id_user`=5;
+
 
 INSERT INTO `customer` (`id_customer`,`nama_customer`,`no_telp`,`alamat`,`created_at`) VALUES
 (1,'Andi Pratama','081212340101','Jl. Kramat Raya, Jakarta Pusat','2024-05-06 00:00:00'),
@@ -690,7 +763,7 @@ SELECT
  'KML050','Spidol Permanent Hitam',6500.00,9500.00,0,'pcs','2024-01-01 08:00:00','2026-09-21 18:40:00'
 WHERE NOT EXISTS (SELECT 1 FROM `barang` WHERE `kode_barang`='KML050' LIMIT 1);
 -- Histori pembelian
-INSERT INTO `pembelian` (`id_pembelian`,`no_pembelian`,`tanggal`,`id_supplier`,`id_user`,`total`,`catatan`,`created_at`) VALUES (1,'PO-202401-0001','2024-01-05 09:00:00',8,1,12138900.00,'Restock rutin persediaan','2024-01-05 09:00:00');
+INSERT INTO `pembelian` (`id_pembelian`,`no_pembelian`,`tanggal`,`tanggal_target`,`id_supplier`,`id_user`,`total`,`catatan`,`status`,`ordered_at`,`cancelled_at`,`created_at`) VALUES (1,'PO-202401-0001','2024-01-05 09:00:00',NULL,8,1,12138900.00,'Restock rutin persediaan','DITERIMA','2024-01-05 09:00:00',NULL,'2024-01-05 09:00:00');
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 1,`id_barang`,82,3000.00,246000.00 FROM `barang` WHERE `kode_barang`='KML001' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 1,`id_barang`,49,5500.00,269500.00 FROM `barang` WHERE `kode_barang`='KML002' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 1,`id_barang`,74,4500.00,333000.00 FROM `barang` WHERE `kode_barang`='KML003' LIMIT 1;
@@ -710,7 +783,7 @@ INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`s
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 1,`id_barang`,74,26000.00,1924000.00 FROM `barang` WHERE `kode_barang`='KML044' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 1,`id_barang`,54,18000.00,972000.00 FROM `barang` WHERE `kode_barang`='KML031' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 1,`id_barang`,62,6500.00,403000.00 FROM `barang` WHERE `kode_barang`='KML050' LIMIT 1;
-INSERT INTO `pembelian` (`id_pembelian`,`no_pembelian`,`tanggal`,`id_supplier`,`id_user`,`total`,`catatan`,`created_at`) VALUES (2,'PO-202402-0002','2024-02-14 09:00:00',1,1,10616600.00,'Restock rutin persediaan','2024-02-14 09:00:00');
+INSERT INTO `pembelian` (`id_pembelian`,`no_pembelian`,`tanggal`,`tanggal_target`,`id_supplier`,`id_user`,`total`,`catatan`,`status`,`ordered_at`,`cancelled_at`,`created_at`) VALUES (2,'PO-202402-0002','2024-02-14 09:00:00',NULL,1,1,10616600.00,'Restock rutin persediaan','DITERIMA','2024-02-14 09:00:00',NULL,'2024-02-14 09:00:00');
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 2,`id_barang`,34,2600.00,88400.00 FROM `barang` WHERE `kode_barang`='KML012' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 2,`id_barang`,42,2600.00,109200.00 FROM `barang` WHERE `kode_barang`='KML013' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 2,`id_barang`,71,6500.00,461500.00 FROM `barang` WHERE `kode_barang`='KML014' LIMIT 1;
@@ -731,7 +804,7 @@ INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`s
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 2,`id_barang`,65,2500.00,162500.00 FROM `barang` WHERE `kode_barang`='KML047' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 2,`id_barang`,53,13500.00,715500.00 FROM `barang` WHERE `kode_barang`='KML040' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 2,`id_barang`,39,6500.00,253500.00 FROM `barang` WHERE `kode_barang`='KML050' LIMIT 1;
-INSERT INTO `pembelian` (`id_pembelian`,`no_pembelian`,`tanggal`,`id_supplier`,`id_user`,`total`,`catatan`,`created_at`) VALUES (3,'PO-202403-0003','2024-03-25 09:00:00',1,1,9997800.00,'Restock rutin persediaan','2024-03-25 09:00:00');
+INSERT INTO `pembelian` (`id_pembelian`,`no_pembelian`,`tanggal`,`tanggal_target`,`id_supplier`,`id_user`,`total`,`catatan`,`status`,`ordered_at`,`cancelled_at`,`created_at`) VALUES (3,'PO-202403-0003','2024-03-25 09:00:00',NULL,1,1,9997800.00,'Restock rutin persediaan','DITERIMA','2024-03-25 09:00:00',NULL,'2024-03-25 09:00:00');
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 3,`id_barang`,45,5500.00,247500.00 FROM `barang` WHERE `kode_barang`='KML022' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 3,`id_barang`,35,8500.00,297500.00 FROM `barang` WHERE `kode_barang`='KML024' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 3,`id_barang`,30,5000.00,150000.00 FROM `barang` WHERE `kode_barang`='KML025' LIMIT 1;
@@ -752,7 +825,7 @@ INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`s
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 3,`id_barang`,81,2600.00,210600.00 FROM `barang` WHERE `kode_barang`='KML012' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 3,`id_barang`,57,10500.00,598500.00 FROM `barang` WHERE `kode_barang`='KML036' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 3,`id_barang`,33,7500.00,247500.00 FROM `barang` WHERE `kode_barang`='KML023' LIMIT 1;
-INSERT INTO `pembelian` (`id_pembelian`,`no_pembelian`,`tanggal`,`id_supplier`,`id_user`,`total`,`catatan`,`created_at`) VALUES (4,'PO-202405-0004','2024-05-01 09:00:00',4,1,9077400.00,'Restock rutin persediaan','2024-05-01 09:00:00');
+INSERT INTO `pembelian` (`id_pembelian`,`no_pembelian`,`tanggal`,`tanggal_target`,`id_supplier`,`id_user`,`total`,`catatan`,`status`,`ordered_at`,`cancelled_at`,`created_at`) VALUES (4,'PO-202405-0004','2024-05-01 09:00:00',NULL,4,1,9077400.00,'Restock rutin persediaan','DITERIMA','2024-05-01 09:00:00',NULL,'2024-05-01 09:00:00');
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 4,`id_barang`,37,16000.00,592000.00 FROM `barang` WHERE `kode_barang`='KML035' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 4,`id_barang`,54,6500.00,351000.00 FROM `barang` WHERE `kode_barang`='KML037' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 4,`id_barang`,55,9000.00,495000.00 FROM `barang` WHERE `kode_barang`='KML043' LIMIT 1;
@@ -772,7 +845,7 @@ INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`s
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 4,`id_barang`,47,4500.00,211500.00 FROM `barang` WHERE `kode_barang`='KML033' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 4,`id_barang`,58,15500.00,899000.00 FROM `barang` WHERE `kode_barang`='KML028' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 4,`id_barang`,44,6000.00,264000.00 FROM `barang` WHERE `kode_barang`='KML019' LIMIT 1;
-INSERT INTO `pembelian` (`id_pembelian`,`no_pembelian`,`tanggal`,`id_supplier`,`id_user`,`total`,`catatan`,`created_at`) VALUES (5,'PO-202406-0005','2024-06-07 09:00:00',1,1,13811600.00,'Restock rutin persediaan','2024-06-07 09:00:00');
+INSERT INTO `pembelian` (`id_pembelian`,`no_pembelian`,`tanggal`,`tanggal_target`,`id_supplier`,`id_user`,`total`,`catatan`,`status`,`ordered_at`,`cancelled_at`,`created_at`) VALUES (5,'PO-202406-0005','2024-06-07 09:00:00',NULL,1,1,13811600.00,'Restock rutin persediaan','DITERIMA','2024-06-07 09:00:00',NULL,'2024-06-07 09:00:00');
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 5,`id_barang`,16,49000.00,784000.00 FROM `barang` WHERE `kode_barang`='KML049' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 5,`id_barang`,44,3500.00,154000.00 FROM `barang` WHERE `kode_barang`='KML048' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 5,`id_barang`,50,5000.00,250000.00 FROM `barang` WHERE `kode_barang`='KML025' LIMIT 1;
@@ -794,7 +867,7 @@ INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`s
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 5,`id_barang`,64,2500.00,160000.00 FROM `barang` WHERE `kode_barang`='KML047' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 5,`id_barang`,61,2600.00,158600.00 FROM `barang` WHERE `kode_barang`='KML012' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 5,`id_barang`,81,9000.00,729000.00 FROM `barang` WHERE `kode_barang`='KML043' LIMIT 1;
-INSERT INTO `pembelian` (`id_pembelian`,`no_pembelian`,`tanggal`,`id_supplier`,`id_user`,`total`,`catatan`,`created_at`) VALUES (6,'PO-202407-0006','2024-07-17 09:00:00',9,1,13371200.00,'Restock rutin persediaan','2024-07-17 09:00:00');
+INSERT INTO `pembelian` (`id_pembelian`,`no_pembelian`,`tanggal`,`tanggal_target`,`id_supplier`,`id_user`,`total`,`catatan`,`status`,`ordered_at`,`cancelled_at`,`created_at`) VALUES (6,'PO-202407-0006','2024-07-17 09:00:00',NULL,9,1,13371200.00,'Restock rutin persediaan','DITERIMA','2024-07-17 09:00:00',NULL,'2024-07-17 09:00:00');
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 6,`id_barang`,22,49000.00,1078000.00 FROM `barang` WHERE `kode_barang`='KML049' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 6,`id_barang`,65,10500.00,682500.00 FROM `barang` WHERE `kode_barang`='KML029' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 6,`id_barang`,79,15000.00,1185000.00 FROM `barang` WHERE `kode_barang`='KML038' LIMIT 1;
@@ -812,7 +885,7 @@ INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`s
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 6,`id_barang`,49,22000.00,1078000.00 FROM `barang` WHERE `kode_barang`='KML018' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 6,`id_barang`,84,16500.00,1386000.00 FROM `barang` WHERE `kode_barang`='KML027' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 6,`id_barang`,35,6500.00,227500.00 FROM `barang` WHERE `kode_barang`='KML015' LIMIT 1;
-INSERT INTO `pembelian` (`id_pembelian`,`no_pembelian`,`tanggal`,`id_supplier`,`id_user`,`total`,`catatan`,`created_at`) VALUES (7,'PO-202408-0007','2024-08-17 09:00:00',3,1,14173400.00,'Restock rutin persediaan','2024-08-17 09:00:00');
+INSERT INTO `pembelian` (`id_pembelian`,`no_pembelian`,`tanggal`,`tanggal_target`,`id_supplier`,`id_user`,`total`,`catatan`,`status`,`ordered_at`,`cancelled_at`,`created_at`) VALUES (7,'PO-202408-0007','2024-08-17 09:00:00',NULL,3,1,14173400.00,'Restock rutin persediaan','DITERIMA','2024-08-17 09:00:00',NULL,'2024-08-17 09:00:00');
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 7,`id_barang`,14,49000.00,686000.00 FROM `barang` WHERE `kode_barang`='KML049' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 7,`id_barang`,50,6500.00,325000.00 FROM `barang` WHERE `kode_barang`='KML014' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 7,`id_barang`,81,14500.00,1174500.00 FROM `barang` WHERE `kode_barang`='KML042' LIMIT 1;
@@ -835,7 +908,7 @@ INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`s
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 7,`id_barang`,75,2600.00,195000.00 FROM `barang` WHERE `kode_barang`='KML011' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 7,`id_barang`,31,18000.00,558000.00 FROM `barang` WHERE `kode_barang`='KML031' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 7,`id_barang`,38,10500.00,399000.00 FROM `barang` WHERE `kode_barang`='KML017' LIMIT 1;
-INSERT INTO `pembelian` (`id_pembelian`,`no_pembelian`,`tanggal`,`id_supplier`,`id_user`,`total`,`catatan`,`created_at`) VALUES (8,'PO-202409-0008','2024-09-19 09:00:00',8,1,13889500.00,'Restock rutin persediaan','2024-09-19 09:00:00');
+INSERT INTO `pembelian` (`id_pembelian`,`no_pembelian`,`tanggal`,`tanggal_target`,`id_supplier`,`id_user`,`total`,`catatan`,`status`,`ordered_at`,`cancelled_at`,`created_at`) VALUES (8,'PO-202409-0008','2024-09-19 09:00:00',NULL,8,1,13889500.00,'Restock rutin persediaan','DITERIMA','2024-09-19 09:00:00',NULL,'2024-09-19 09:00:00');
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 8,`id_barang`,12,49000.00,588000.00 FROM `barang` WHERE `kode_barang`='KML049' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 8,`id_barang`,83,5000.00,415000.00 FROM `barang` WHERE `kode_barang`='KML025' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 8,`id_barang`,54,7000.00,378000.00 FROM `barang` WHERE `kode_barang`='KML021' LIMIT 1;
@@ -858,7 +931,7 @@ INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`s
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 8,`id_barang`,33,9500.00,313500.00 FROM `barang` WHERE `kode_barang`='KML005' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 8,`id_barang`,57,18000.00,1026000.00 FROM `barang` WHERE `kode_barang`='KML031' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 8,`id_barang`,33,15500.00,511500.00 FROM `barang` WHERE `kode_barang`='KML028' LIMIT 1;
-INSERT INTO `pembelian` (`id_pembelian`,`no_pembelian`,`tanggal`,`id_supplier`,`id_user`,`total`,`catatan`,`created_at`) VALUES (9,'PO-202410-0009','2024-10-25 09:00:00',2,1,9017300.00,'Restock rutin persediaan','2024-10-25 09:00:00');
+INSERT INTO `pembelian` (`id_pembelian`,`no_pembelian`,`tanggal`,`tanggal_target`,`id_supplier`,`id_user`,`total`,`catatan`,`status`,`ordered_at`,`cancelled_at`,`created_at`) VALUES (9,'PO-202410-0009','2024-10-25 09:00:00',NULL,2,1,9017300.00,'Restock rutin persediaan','DITERIMA','2024-10-25 09:00:00',NULL,'2024-10-25 09:00:00');
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 9,`id_barang`,22,49000.00,1078000.00 FROM `barang` WHERE `kode_barang`='KML049' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 9,`id_barang`,52,10500.00,546000.00 FROM `barang` WHERE `kode_barang`='KML029' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 9,`id_barang`,41,6000.00,246000.00 FROM `barang` WHERE `kode_barang`='KML019' LIMIT 1;
@@ -876,7 +949,7 @@ INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`s
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 9,`id_barang`,71,4000.00,284000.00 FROM `barang` WHERE `kode_barang`='KML034' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 9,`id_barang`,52,22000.00,1144000.00 FROM `barang` WHERE `kode_barang`='KML018' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 9,`id_barang`,55,5500.00,302500.00 FROM `barang` WHERE `kode_barang`='KML002' LIMIT 1;
-INSERT INTO `pembelian` (`id_pembelian`,`no_pembelian`,`tanggal`,`id_supplier`,`id_user`,`total`,`catatan`,`created_at`) VALUES (10,'PO-202411-0010','2024-11-29 09:00:00',6,1,15594000.00,'Restock rutin persediaan','2024-11-29 09:00:00');
+INSERT INTO `pembelian` (`id_pembelian`,`no_pembelian`,`tanggal`,`tanggal_target`,`id_supplier`,`id_user`,`total`,`catatan`,`status`,`ordered_at`,`cancelled_at`,`created_at`) VALUES (10,'PO-202411-0010','2024-11-29 09:00:00',NULL,6,1,15594000.00,'Restock rutin persediaan','DITERIMA','2024-11-29 09:00:00',NULL,'2024-11-29 09:00:00');
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 10,`id_barang`,28,49000.00,1372000.00 FROM `barang` WHERE `kode_barang`='KML049' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 10,`id_barang`,70,5500.00,385000.00 FROM `barang` WHERE `kode_barang`='KML006' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 10,`id_barang`,69,10500.00,724500.00 FROM `barang` WHERE `kode_barang`='KML017' LIMIT 1;
@@ -899,7 +972,7 @@ INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`s
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 10,`id_barang`,45,16500.00,742500.00 FROM `barang` WHERE `kode_barang`='KML027' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 10,`id_barang`,41,12000.00,492000.00 FROM `barang` WHERE `kode_barang`='KML046' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 10,`id_barang`,43,8500.00,365500.00 FROM `barang` WHERE `kode_barang`='KML020' LIMIT 1;
-INSERT INTO `pembelian` (`id_pembelian`,`no_pembelian`,`tanggal`,`id_supplier`,`id_user`,`total`,`catatan`,`created_at`) VALUES (11,'PO-202412-0011','2024-12-30 09:00:00',1,1,11408800.00,'Restock rutin persediaan','2024-12-30 09:00:00');
+INSERT INTO `pembelian` (`id_pembelian`,`no_pembelian`,`tanggal`,`tanggal_target`,`id_supplier`,`id_user`,`total`,`catatan`,`status`,`ordered_at`,`cancelled_at`,`created_at`) VALUES (11,'PO-202412-0011','2024-12-30 09:00:00',NULL,1,1,11408800.00,'Restock rutin persediaan','DITERIMA','2024-12-30 09:00:00',NULL,'2024-12-30 09:00:00');
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 11,`id_barang`,21,49000.00,1029000.00 FROM `barang` WHERE `kode_barang`='KML049' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 11,`id_barang`,67,9500.00,636500.00 FROM `barang` WHERE `kode_barang`='KML005' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 11,`id_barang`,58,6000.00,348000.00 FROM `barang` WHERE `kode_barang`='KML019' LIMIT 1;
@@ -921,7 +994,7 @@ INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`s
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 11,`id_barang`,62,21500.00,1333000.00 FROM `barang` WHERE `kode_barang`='KML030' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 11,`id_barang`,48,6500.00,312000.00 FROM `barang` WHERE `kode_barang`='KML037' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 11,`id_barang`,51,14500.00,739500.00 FROM `barang` WHERE `kode_barang`='KML042' LIMIT 1;
-INSERT INTO `pembelian` (`id_pembelian`,`no_pembelian`,`tanggal`,`id_supplier`,`id_user`,`total`,`catatan`,`created_at`) VALUES (12,'PO-202502-0012','2025-02-01 09:00:00',1,1,13463400.00,'Restock rutin persediaan','2025-02-01 09:00:00');
+INSERT INTO `pembelian` (`id_pembelian`,`no_pembelian`,`tanggal`,`tanggal_target`,`id_supplier`,`id_user`,`total`,`catatan`,`status`,`ordered_at`,`cancelled_at`,`created_at`) VALUES (12,'PO-202502-0012','2025-02-01 09:00:00',NULL,1,1,13463400.00,'Restock rutin persediaan','DITERIMA','2025-02-01 09:00:00',NULL,'2025-02-01 09:00:00');
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 12,`id_barang`,21,49000.00,1029000.00 FROM `barang` WHERE `kode_barang`='KML049' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 12,`id_barang`,73,5000.00,365000.00 FROM `barang` WHERE `kode_barang`='KML025' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 12,`id_barang`,39,7000.00,273000.00 FROM `barang` WHERE `kode_barang`='KML021' LIMIT 1;
@@ -944,7 +1017,7 @@ INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`s
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 12,`id_barang`,34,2600.00,88400.00 FROM `barang` WHERE `kode_barang`='KML013' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 12,`id_barang`,55,4500.00,247500.00 FROM `barang` WHERE `kode_barang`='KML033' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 12,`id_barang`,68,10500.00,714000.00 FROM `barang` WHERE `kode_barang`='KML032' LIMIT 1;
-INSERT INTO `pembelian` (`id_pembelian`,`no_pembelian`,`tanggal`,`id_supplier`,`id_user`,`total`,`catatan`,`created_at`) VALUES (13,'PO-202503-0013','2025-03-01 09:00:00',5,1,8987000.00,'Restock rutin persediaan','2025-03-01 09:00:00');
+INSERT INTO `pembelian` (`id_pembelian`,`no_pembelian`,`tanggal`,`tanggal_target`,`id_supplier`,`id_user`,`total`,`catatan`,`status`,`ordered_at`,`cancelled_at`,`created_at`) VALUES (13,'PO-202503-0013','2025-03-01 09:00:00',NULL,5,1,8987000.00,'Restock rutin persediaan','DITERIMA','2025-03-01 09:00:00',NULL,'2025-03-01 09:00:00');
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 13,`id_barang`,11,49000.00,539000.00 FROM `barang` WHERE `kode_barang`='KML049' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 13,`id_barang`,22,67000.00,1474000.00 FROM `barang` WHERE `kode_barang`='KML026' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 13,`id_barang`,64,13000.00,832000.00 FROM `barang` WHERE `kode_barang`='KML016' LIMIT 1;
@@ -961,7 +1034,7 @@ INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`s
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 13,`id_barang`,75,3500.00,262500.00 FROM `barang` WHERE `kode_barang`='KML048' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 13,`id_barang`,69,4500.00,310500.00 FROM `barang` WHERE `kode_barang`='KML003' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 13,`id_barang`,68,6000.00,408000.00 FROM `barang` WHERE `kode_barang`='KML019' LIMIT 1;
-INSERT INTO `pembelian` (`id_pembelian`,`no_pembelian`,`tanggal`,`id_supplier`,`id_user`,`total`,`catatan`,`created_at`) VALUES (14,'PO-202504-0014','2025-04-02 09:00:00',2,1,10006000.00,'Restock rutin persediaan','2025-04-02 09:00:00');
+INSERT INTO `pembelian` (`id_pembelian`,`no_pembelian`,`tanggal`,`tanggal_target`,`id_supplier`,`id_user`,`total`,`catatan`,`status`,`ordered_at`,`cancelled_at`,`created_at`) VALUES (14,'PO-202504-0014','2025-04-02 09:00:00',NULL,2,1,10006000.00,'Restock rutin persediaan','DITERIMA','2025-04-02 09:00:00',NULL,'2025-04-02 09:00:00');
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 14,`id_barang`,21,49000.00,1029000.00 FROM `barang` WHERE `kode_barang`='KML049' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 14,`id_barang`,21,67000.00,1407000.00 FROM `barang` WHERE `kode_barang`='KML026' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 14,`id_barang`,61,26000.00,1586000.00 FROM `barang` WHERE `kode_barang`='KML044' LIMIT 1;
@@ -981,7 +1054,7 @@ INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`s
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 14,`id_barang`,34,6500.00,221000.00 FROM `barang` WHERE `kode_barang`='KML010' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 14,`id_barang`,85,3500.00,297500.00 FROM `barang` WHERE `kode_barang`='KML048' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 14,`id_barang`,35,2600.00,91000.00 FROM `barang` WHERE `kode_barang`='KML013' LIMIT 1;
-INSERT INTO `pembelian` (`id_pembelian`,`no_pembelian`,`tanggal`,`id_supplier`,`id_user`,`total`,`catatan`,`created_at`) VALUES (15,'PO-202505-0015','2025-05-07 09:00:00',7,1,15048500.00,'Restock rutin persediaan','2025-05-07 09:00:00');
+INSERT INTO `pembelian` (`id_pembelian`,`no_pembelian`,`tanggal`,`tanggal_target`,`id_supplier`,`id_user`,`total`,`catatan`,`status`,`ordered_at`,`cancelled_at`,`created_at`) VALUES (15,'PO-202505-0015','2025-05-07 09:00:00',NULL,7,1,15048500.00,'Restock rutin persediaan','DITERIMA','2025-05-07 09:00:00',NULL,'2025-05-07 09:00:00');
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 15,`id_barang`,20,49000.00,980000.00 FROM `barang` WHERE `kode_barang`='KML049' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 15,`id_barang`,25,67000.00,1675000.00 FROM `barang` WHERE `kode_barang`='KML026' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 15,`id_barang`,35,7500.00,262500.00 FROM `barang` WHERE `kode_barang`='KML023' LIMIT 1;
@@ -1004,7 +1077,7 @@ INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`s
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 15,`id_barang`,71,7000.00,497000.00 FROM `barang` WHERE `kode_barang`='KML009' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 15,`id_barang`,61,17500.00,1067500.00 FROM `barang` WHERE `kode_barang`='KML007' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 15,`id_barang`,64,4500.00,288000.00 FROM `barang` WHERE `kode_barang`='KML033' LIMIT 1;
-INSERT INTO `pembelian` (`id_pembelian`,`no_pembelian`,`tanggal`,`id_supplier`,`id_user`,`total`,`catatan`,`created_at`) VALUES (16,'PO-202506-0016','2025-06-08 09:00:00',8,1,13037000.00,'Restock rutin persediaan','2025-06-08 09:00:00');
+INSERT INTO `pembelian` (`id_pembelian`,`no_pembelian`,`tanggal`,`tanggal_target`,`id_supplier`,`id_user`,`total`,`catatan`,`status`,`ordered_at`,`cancelled_at`,`created_at`) VALUES (16,'PO-202506-0016','2025-06-08 09:00:00',NULL,8,1,13037000.00,'Restock rutin persediaan','DITERIMA','2025-06-08 09:00:00',NULL,'2025-06-08 09:00:00');
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 16,`id_barang`,21,49000.00,1029000.00 FROM `barang` WHERE `kode_barang`='KML049' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 16,`id_barang`,21,67000.00,1407000.00 FROM `barang` WHERE `kode_barang`='KML026' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 16,`id_barang`,80,6500.00,520000.00 FROM `barang` WHERE `kode_barang`='KML015' LIMIT 1;
@@ -1024,7 +1097,7 @@ INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`s
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 16,`id_barang`,85,5500.00,467500.00 FROM `barang` WHERE `kode_barang`='KML002' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 16,`id_barang`,54,2500.00,135000.00 FROM `barang` WHERE `kode_barang`='KML047' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 16,`id_barang`,44,7000.00,308000.00 FROM `barang` WHERE `kode_barang`='KML021' LIMIT 1;
-INSERT INTO `pembelian` (`id_pembelian`,`no_pembelian`,`tanggal`,`id_supplier`,`id_user`,`total`,`catatan`,`created_at`) VALUES (17,'PO-202507-0017','2025-07-06 09:00:00',10,1,13783500.00,'Restock rutin persediaan','2025-07-06 09:00:00');
+INSERT INTO `pembelian` (`id_pembelian`,`no_pembelian`,`tanggal`,`tanggal_target`,`id_supplier`,`id_user`,`total`,`catatan`,`status`,`ordered_at`,`cancelled_at`,`created_at`) VALUES (17,'PO-202507-0017','2025-07-06 09:00:00',NULL,10,1,13783500.00,'Restock rutin persediaan','DITERIMA','2025-07-06 09:00:00',NULL,'2025-07-06 09:00:00');
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 17,`id_barang`,22,49000.00,1078000.00 FROM `barang` WHERE `kode_barang`='KML049' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 17,`id_barang`,13,67000.00,871000.00 FROM `barang` WHERE `kode_barang`='KML026' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 17,`id_barang`,53,6500.00,344500.00 FROM `barang` WHERE `kode_barang`='KML037' LIMIT 1;
@@ -1047,7 +1120,7 @@ INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`s
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 17,`id_barang`,75,15000.00,1125000.00 FROM `barang` WHERE `kode_barang`='KML038' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 17,`id_barang`,44,16000.00,704000.00 FROM `barang` WHERE `kode_barang`='KML035' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 17,`id_barang`,32,4500.00,144000.00 FROM `barang` WHERE `kode_barang`='KML033' LIMIT 1;
-INSERT INTO `pembelian` (`id_pembelian`,`no_pembelian`,`tanggal`,`id_supplier`,`id_user`,`total`,`catatan`,`created_at`) VALUES (18,'PO-202508-0018','2025-08-15 09:00:00',3,1,13358800.00,'Restock rutin persediaan','2025-08-15 09:00:00');
+INSERT INTO `pembelian` (`id_pembelian`,`no_pembelian`,`tanggal`,`tanggal_target`,`id_supplier`,`id_user`,`total`,`catatan`,`status`,`ordered_at`,`cancelled_at`,`created_at`) VALUES (18,'PO-202508-0018','2025-08-15 09:00:00',NULL,3,1,13358800.00,'Restock rutin persediaan','DITERIMA','2025-08-15 09:00:00',NULL,'2025-08-15 09:00:00');
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 18,`id_barang`,19,49000.00,931000.00 FROM `barang` WHERE `kode_barang`='KML049' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 18,`id_barang`,14,67000.00,938000.00 FROM `barang` WHERE `kode_barang`='KML026' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 18,`id_barang`,66,13500.00,891000.00 FROM `barang` WHERE `kode_barang`='KML040' LIMIT 1;
@@ -1070,7 +1143,7 @@ INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`s
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 18,`id_barang`,74,9500.00,703000.00 FROM `barang` WHERE `kode_barang`='KML005' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 18,`id_barang`,58,6000.00,348000.00 FROM `barang` WHERE `kode_barang`='KML019' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 18,`id_barang`,58,17000.00,986000.00 FROM `barang` WHERE `kode_barang`='KML041' LIMIT 1;
-INSERT INTO `pembelian` (`id_pembelian`,`no_pembelian`,`tanggal`,`id_supplier`,`id_user`,`total`,`catatan`,`created_at`) VALUES (19,'PO-202509-0019','2025-09-15 09:00:00',8,1,9568500.00,'Restock rutin persediaan','2025-09-15 09:00:00');
+INSERT INTO `pembelian` (`id_pembelian`,`no_pembelian`,`tanggal`,`tanggal_target`,`id_supplier`,`id_user`,`total`,`catatan`,`status`,`ordered_at`,`cancelled_at`,`created_at`) VALUES (19,'PO-202509-0019','2025-09-15 09:00:00',NULL,8,1,9568500.00,'Restock rutin persediaan','DITERIMA','2025-09-15 09:00:00',NULL,'2025-09-15 09:00:00');
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 19,`id_barang`,26,49000.00,1274000.00 FROM `barang` WHERE `kode_barang`='KML049' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 19,`id_barang`,10,67000.00,670000.00 FROM `barang` WHERE `kode_barang`='KML026' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 19,`id_barang`,37,6500.00,240500.00 FROM `barang` WHERE `kode_barang`='KML008' LIMIT 1;
@@ -1087,7 +1160,7 @@ INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`s
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 19,`id_barang`,77,6000.00,462000.00 FROM `barang` WHERE `kode_barang`='KML019' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 19,`id_barang`,32,10500.00,336000.00 FROM `barang` WHERE `kode_barang`='KML029' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 19,`id_barang`,59,5500.00,324500.00 FROM `barang` WHERE `kode_barang`='KML002' LIMIT 1;
-INSERT INTO `pembelian` (`id_pembelian`,`no_pembelian`,`tanggal`,`id_supplier`,`id_user`,`total`,`catatan`,`created_at`) VALUES (20,'PO-202510-0020','2025-10-24 09:00:00',8,1,11810400.00,'Restock rutin persediaan','2025-10-24 09:00:00');
+INSERT INTO `pembelian` (`id_pembelian`,`no_pembelian`,`tanggal`,`tanggal_target`,`id_supplier`,`id_user`,`total`,`catatan`,`status`,`ordered_at`,`cancelled_at`,`created_at`) VALUES (20,'PO-202510-0020','2025-10-24 09:00:00',NULL,8,1,11810400.00,'Restock rutin persediaan','DITERIMA','2025-10-24 09:00:00',NULL,'2025-10-24 09:00:00');
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 20,`id_barang`,14,67000.00,938000.00 FROM `barang` WHERE `kode_barang`='KML026' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 20,`id_barang`,17,49000.00,833000.00 FROM `barang` WHERE `kode_barang`='KML049' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 20,`id_barang`,60,6500.00,390000.00 FROM `barang` WHERE `kode_barang`='KML008' LIMIT 1;
@@ -1107,7 +1180,7 @@ INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`s
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 20,`id_barang`,54,2600.00,140400.00 FROM `barang` WHERE `kode_barang`='KML013' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 20,`id_barang`,46,5000.00,230000.00 FROM `barang` WHERE `kode_barang`='KML025' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 20,`id_barang`,30,22000.00,660000.00 FROM `barang` WHERE `kode_barang`='KML018' LIMIT 1;
-INSERT INTO `pembelian` (`id_pembelian`,`no_pembelian`,`tanggal`,`id_supplier`,`id_user`,`total`,`catatan`,`created_at`) VALUES (21,'PO-202511-0021','2025-11-21 09:00:00',1,1,13473700.00,'Restock rutin persediaan','2025-11-21 09:00:00');
+INSERT INTO `pembelian` (`id_pembelian`,`no_pembelian`,`tanggal`,`tanggal_target`,`id_supplier`,`id_user`,`total`,`catatan`,`status`,`ordered_at`,`cancelled_at`,`created_at`) VALUES (21,'PO-202511-0021','2025-11-21 09:00:00',NULL,1,1,13473700.00,'Restock rutin persediaan','DITERIMA','2025-11-21 09:00:00',NULL,'2025-11-21 09:00:00');
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 21,`id_barang`,25,67000.00,1675000.00 FROM `barang` WHERE `kode_barang`='KML026' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 21,`id_barang`,24,49000.00,1176000.00 FROM `barang` WHERE `kode_barang`='KML049' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 21,`id_barang`,45,8500.00,382500.00 FROM `barang` WHERE `kode_barang`='KML024' LIMIT 1;
@@ -1130,7 +1203,7 @@ INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`s
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 21,`id_barang`,41,26000.00,1066000.00 FROM `barang` WHERE `kode_barang`='KML044' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 21,`id_barang`,64,2600.00,166400.00 FROM `barang` WHERE `kode_barang`='KML013' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 21,`id_barang`,34,7500.00,255000.00 FROM `barang` WHERE `kode_barang`='KML023' LIMIT 1;
-INSERT INTO `pembelian` (`id_pembelian`,`no_pembelian`,`tanggal`,`id_supplier`,`id_user`,`total`,`catatan`,`created_at`) VALUES (22,'PO-202512-0022','2025-12-24 09:00:00',10,1,10025000.00,'Restock rutin persediaan','2025-12-24 09:00:00');
+INSERT INTO `pembelian` (`id_pembelian`,`no_pembelian`,`tanggal`,`tanggal_target`,`id_supplier`,`id_user`,`total`,`catatan`,`status`,`ordered_at`,`cancelled_at`,`created_at`) VALUES (22,'PO-202512-0022','2025-12-24 09:00:00',NULL,10,1,10025000.00,'Restock rutin persediaan','DITERIMA','2025-12-24 09:00:00',NULL,'2025-12-24 09:00:00');
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 22,`id_barang`,23,67000.00,1541000.00 FROM `barang` WHERE `kode_barang`='KML026' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 22,`id_barang`,23,49000.00,1127000.00 FROM `barang` WHERE `kode_barang`='KML049' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 22,`id_barang`,74,8500.00,629000.00 FROM `barang` WHERE `kode_barang`='KML020' LIMIT 1;
@@ -1148,7 +1221,7 @@ INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`s
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 22,`id_barang`,31,6000.00,186000.00 FROM `barang` WHERE `kode_barang`='KML019' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 22,`id_barang`,65,2600.00,169000.00 FROM `barang` WHERE `kode_barang`='KML012' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 22,`id_barang`,31,15000.00,465000.00 FROM `barang` WHERE `kode_barang`='KML045' LIMIT 1;
-INSERT INTO `pembelian` (`id_pembelian`,`no_pembelian`,`tanggal`,`id_supplier`,`id_user`,`total`,`catatan`,`created_at`) VALUES (23,'PO-202601-0023','2026-01-31 09:00:00',1,1,13054000.00,'Restock rutin persediaan','2026-01-31 09:00:00');
+INSERT INTO `pembelian` (`id_pembelian`,`no_pembelian`,`tanggal`,`tanggal_target`,`id_supplier`,`id_user`,`total`,`catatan`,`status`,`ordered_at`,`cancelled_at`,`created_at`) VALUES (23,'PO-202601-0023','2026-01-31 09:00:00',NULL,1,1,13054000.00,'Restock rutin persediaan','DITERIMA','2026-01-31 09:00:00',NULL,'2026-01-31 09:00:00');
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 23,`id_barang`,15,67000.00,1005000.00 FROM `barang` WHERE `kode_barang`='KML026' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 23,`id_barang`,16,49000.00,784000.00 FROM `barang` WHERE `kode_barang`='KML049' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 23,`id_barang`,72,3000.00,216000.00 FROM `barang` WHERE `kode_barang`='KML001' LIMIT 1;
@@ -1171,7 +1244,7 @@ INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`s
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 23,`id_barang`,58,8500.00,493000.00 FROM `barang` WHERE `kode_barang`='KML020' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 23,`id_barang`,85,18000.00,1530000.00 FROM `barang` WHERE `kode_barang`='KML031' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 23,`id_barang`,80,13500.00,1080000.00 FROM `barang` WHERE `kode_barang`='KML040' LIMIT 1;
-INSERT INTO `pembelian` (`id_pembelian`,`no_pembelian`,`tanggal`,`id_supplier`,`id_user`,`total`,`catatan`,`created_at`) VALUES (24,'PO-202603-0024','2026-03-05 09:00:00',5,1,14141100.00,'Restock rutin persediaan','2026-03-05 09:00:00');
+INSERT INTO `pembelian` (`id_pembelian`,`no_pembelian`,`tanggal`,`tanggal_target`,`id_supplier`,`id_user`,`total`,`catatan`,`status`,`ordered_at`,`cancelled_at`,`created_at`) VALUES (24,'PO-202603-0024','2026-03-05 09:00:00',NULL,5,1,14141100.00,'Restock rutin persediaan','DITERIMA','2026-03-05 09:00:00',NULL,'2026-03-05 09:00:00');
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 24,`id_barang`,20,67000.00,1340000.00 FROM `barang` WHERE `kode_barang`='KML026' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 24,`id_barang`,23,49000.00,1127000.00 FROM `barang` WHERE `kode_barang`='KML049' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 24,`id_barang`,76,16000.00,1216000.00 FROM `barang` WHERE `kode_barang`='KML035' LIMIT 1;
@@ -1194,7 +1267,7 @@ INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`s
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 24,`id_barang`,34,5500.00,187000.00 FROM `barang` WHERE `kode_barang`='KML006' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 24,`id_barang`,72,13500.00,972000.00 FROM `barang` WHERE `kode_barang`='KML040' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 24,`id_barang`,53,17000.00,901000.00 FROM `barang` WHERE `kode_barang`='KML041' LIMIT 1;
-INSERT INTO `pembelian` (`id_pembelian`,`no_pembelian`,`tanggal`,`id_supplier`,`id_user`,`total`,`catatan`,`created_at`) VALUES (25,'PO-202604-0025','2026-04-10 09:00:00',2,1,13313900.00,'Restock rutin persediaan','2026-04-10 09:00:00');
+INSERT INTO `pembelian` (`id_pembelian`,`no_pembelian`,`tanggal`,`tanggal_target`,`id_supplier`,`id_user`,`total`,`catatan`,`status`,`ordered_at`,`cancelled_at`,`created_at`) VALUES (25,'PO-202604-0025','2026-04-10 09:00:00',NULL,2,1,13313900.00,'Restock rutin persediaan','DITERIMA','2026-04-10 09:00:00',NULL,'2026-04-10 09:00:00');
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 25,`id_barang`,13,67000.00,871000.00 FROM `barang` WHERE `kode_barang`='KML026' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 25,`id_barang`,22,49000.00,1078000.00 FROM `barang` WHERE `kode_barang`='KML049' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 25,`id_barang`,69,14500.00,1000500.00 FROM `barang` WHERE `kode_barang`='KML042' LIMIT 1;
@@ -1214,7 +1287,7 @@ INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`s
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 25,`id_barang`,34,26000.00,884000.00 FROM `barang` WHERE `kode_barang`='KML044' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 25,`id_barang`,68,22000.00,1496000.00 FROM `barang` WHERE `kode_barang`='KML018' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 25,`id_barang`,69,2600.00,179400.00 FROM `barang` WHERE `kode_barang`='KML013' LIMIT 1;
-INSERT INTO `pembelian` (`id_pembelian`,`no_pembelian`,`tanggal`,`id_supplier`,`id_user`,`total`,`catatan`,`created_at`) VALUES (26,'PO-202605-0026','2026-05-17 09:00:00',6,1,11135900.00,'Restock rutin persediaan','2026-05-17 09:00:00');
+INSERT INTO `pembelian` (`id_pembelian`,`no_pembelian`,`tanggal`,`tanggal_target`,`id_supplier`,`id_user`,`total`,`catatan`,`status`,`ordered_at`,`cancelled_at`,`created_at`) VALUES (26,'PO-202605-0026','2026-05-17 09:00:00',NULL,6,1,11135900.00,'Restock rutin persediaan','DITERIMA','2026-05-17 09:00:00',NULL,'2026-05-17 09:00:00');
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 26,`id_barang`,18,67000.00,1206000.00 FROM `barang` WHERE `kode_barang`='KML026' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 26,`id_barang`,24,49000.00,1176000.00 FROM `barang` WHERE `kode_barang`='KML049' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 26,`id_barang`,44,10500.00,462000.00 FROM `barang` WHERE `kode_barang`='KML017' LIMIT 1;
@@ -1234,7 +1307,7 @@ INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`s
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 26,`id_barang`,55,2600.00,143000.00 FROM `barang` WHERE `kode_barang`='KML012' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 26,`id_barang`,63,18000.00,1134000.00 FROM `barang` WHERE `kode_barang`='KML031' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 26,`id_barang`,73,4500.00,328500.00 FROM `barang` WHERE `kode_barang`='KML003' LIMIT 1;
-INSERT INTO `pembelian` (`id_pembelian`,`no_pembelian`,`tanggal`,`id_supplier`,`id_user`,`total`,`catatan`,`created_at`) VALUES (27,'PO-202606-0027','2026-06-25 09:00:00',1,1,12187300.00,'Restock rutin persediaan','2026-06-25 09:00:00');
+INSERT INTO `pembelian` (`id_pembelian`,`no_pembelian`,`tanggal`,`tanggal_target`,`id_supplier`,`id_user`,`total`,`catatan`,`status`,`ordered_at`,`cancelled_at`,`created_at`) VALUES (27,'PO-202606-0027','2026-06-25 09:00:00',NULL,1,1,12187300.00,'Restock rutin persediaan','DITERIMA','2026-06-25 09:00:00',NULL,'2026-06-25 09:00:00');
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 27,`id_barang`,27,67000.00,1809000.00 FROM `barang` WHERE `kode_barang`='KML026' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 27,`id_barang`,15,49000.00,735000.00 FROM `barang` WHERE `kode_barang`='KML049' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 27,`id_barang`,59,15000.00,885000.00 FROM `barang` WHERE `kode_barang`='KML045' LIMIT 1;
@@ -1255,7 +1328,7 @@ INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`s
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 27,`id_barang`,44,26000.00,1144000.00 FROM `barang` WHERE `kode_barang`='KML044' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 27,`id_barang`,33,7000.00,231000.00 FROM `barang` WHERE `kode_barang`='KML021' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 27,`id_barang`,78,2600.00,202800.00 FROM `barang` WHERE `kode_barang`='KML013' LIMIT 1;
-INSERT INTO `pembelian` (`id_pembelian`,`no_pembelian`,`tanggal`,`id_supplier`,`id_user`,`total`,`catatan`,`created_at`) VALUES (28,'PO-202607-0028','2026-07-27 09:00:00',3,1,8712500.00,'Restock rutin persediaan','2026-07-27 09:00:00');
+INSERT INTO `pembelian` (`id_pembelian`,`no_pembelian`,`tanggal`,`tanggal_target`,`id_supplier`,`id_user`,`total`,`catatan`,`status`,`ordered_at`,`cancelled_at`,`created_at`) VALUES (28,'PO-202607-0028','2026-07-27 09:00:00',NULL,3,1,8712500.00,'Restock rutin persediaan','DITERIMA','2026-07-27 09:00:00',NULL,'2026-07-27 09:00:00');
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 28,`id_barang`,14,67000.00,938000.00 FROM `barang` WHERE `kode_barang`='KML026' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 28,`id_barang`,19,49000.00,931000.00 FROM `barang` WHERE `kode_barang`='KML049' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 28,`id_barang`,50,6500.00,325000.00 FROM `barang` WHERE `kode_barang`='KML050' LIMIT 1;
@@ -1272,7 +1345,7 @@ INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`s
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 28,`id_barang`,72,8500.00,612000.00 FROM `barang` WHERE `kode_barang`='KML024' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 28,`id_barang`,42,15000.00,630000.00 FROM `barang` WHERE `kode_barang`='KML038' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 28,`id_barang`,33,5000.00,165000.00 FROM `barang` WHERE `kode_barang`='KML025' LIMIT 1;
-INSERT INTO `pembelian` (`id_pembelian`,`no_pembelian`,`tanggal`,`id_supplier`,`id_user`,`total`,`catatan`,`created_at`) VALUES (29,'PO-202609-0029','2026-09-05 09:00:00',3,1,12576800.00,'Restock rutin persediaan','2026-09-05 09:00:00');
+INSERT INTO `pembelian` (`id_pembelian`,`no_pembelian`,`tanggal`,`tanggal_target`,`id_supplier`,`id_user`,`total`,`catatan`,`status`,`ordered_at`,`cancelled_at`,`created_at`) VALUES (29,'PO-202609-0029','2026-09-05 09:00:00',NULL,3,1,12576800.00,'Restock rutin persediaan','DITERIMA','2026-09-05 09:00:00',NULL,'2026-09-05 09:00:00');
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 29,`id_barang`,18,67000.00,1206000.00 FROM `barang` WHERE `kode_barang`='KML026' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 29,`id_barang`,28,49000.00,1372000.00 FROM `barang` WHERE `kode_barang`='KML049' LIMIT 1;
 INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`harga_beli`,`subtotal`) SELECT 29,`id_barang`,81,10500.00,850500.00 FROM `barang` WHERE `kode_barang`='KML036' LIMIT 1;
@@ -2276,6 +2349,19 @@ INSERT INTO `penjualan` (`id_penjualan`,`no_transaksi`,`tanggal`,`id_customer`,`
 INSERT INTO `detail_penjualan` (`id_penjualan`,`id_barang`,`qty`,`harga`,`harga_modal`,`subtotal`) SELECT 282,`id_barang`,3,7000.00,4500.00,21000.00 FROM `barang` WHERE `kode_barang`='KML003' LIMIT 1;
 INSERT INTO `detail_penjualan` (`id_penjualan`,`id_barang`,`qty`,`harga`,`harga_modal`,`subtotal`) SELECT 282,`id_barang`,4,9500.00,6500.00,38000.00 FROM `barang` WHERE `kode_barang`='KML037' LIMIT 1;
 -- Mutasi stok kronologis
+UPDATE `detail_pembelian` SET `qty_diterima`=`qty`;
+
+
+-- Open demo PO for Phase 12. It does NOT change stock until Gudang receives it.
+INSERT INTO `pembelian`
+(`id_pembelian`,`no_pembelian`,`tanggal`,`tanggal_target`,`id_supplier`,`id_user`,`total`,`catatan`,`status`,`ordered_at`,`cancelled_at`,`created_at`)
+VALUES
+(30,'PO-DEMO-OPEN',TIMESTAMP(CURDATE(),'09:00:00'),DATE_ADD(CURDATE(), INTERVAL 2 DAY),1,5,200000.00,'Demo PO aktif menunggu penerimaan Gudang','DIORDER',TIMESTAMP(CURDATE(),'09:00:00'),NULL,TIMESTAMP(CURDATE(),'09:00:00'));
+INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`qty_diterima`,`harga_beli`,`subtotal`)
+SELECT 30,`id_barang`,30,0,3000.00,90000.00 FROM `barang` WHERE `kode_barang`='KML001' LIMIT 1;
+INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`qty_diterima`,`harga_beli`,`subtotal`)
+SELECT 30,`id_barang`,20,0,5500.00,110000.00 FROM `barang` WHERE `kode_barang`='KML002' LIMIT 1;
+
 INSERT INTO `mutasi_stok` (`id_barang`,`id_user`,`tipe`,`qty`,`stok_sebelum`,`stok_sesudah`,`referensi_tipe`,`referensi_id`,`keterangan`,`created_at`) SELECT `id_barang`,1,'MASUK',82,0,82,'PEMBELIAN',1,'Restock Jan 2024','2024-01-05 09:00:00' FROM `barang` WHERE `kode_barang`='KML001' LIMIT 1;
 INSERT INTO `mutasi_stok` (`id_barang`,`id_user`,`tipe`,`qty`,`stok_sebelum`,`stok_sesudah`,`referensi_tipe`,`referensi_id`,`keterangan`,`created_at`) SELECT `id_barang`,1,'MASUK',49,0,49,'PEMBELIAN',1,'Restock Jan 2024','2024-01-05 09:00:00' FROM `barang` WHERE `kode_barang`='KML002' LIMIT 1;
 INSERT INTO `mutasi_stok` (`id_barang`,`id_user`,`tipe`,`qty`,`stok_sebelum`,`stok_sesudah`,`referensi_tipe`,`referensi_id`,`keterangan`,`created_at`) SELECT `id_barang`,1,'MASUK',74,0,74,'PEMBELIAN',1,'Restock Jan 2024','2024-01-05 09:00:00' FROM `barang` WHERE `kode_barang`='KML003' LIMIT 1;
@@ -3549,10 +3635,10 @@ INSERT INTO `mutasi_stok` (`id_barang`,`id_user`,`tipe`,`qty`,`stok_sebelum`,`st
 INSERT INTO `mutasi_stok` (`id_barang`,`id_user`,`tipe`,`qty`,`stok_sebelum`,`stok_sesudah`,`referensi_tipe`,`referensi_id`,`keterangan`,`created_at`) SELECT `id_barang`,2,'KELUAR',4,576,572,'PENJUALAN',281,'Penjualan 21 Sep 2026','2026-09-21 13:25:00' FROM `barang` WHERE `kode_barang`='KML014' LIMIT 1;
 INSERT INTO `mutasi_stok` (`id_barang`,`id_user`,`tipe`,`qty`,`stok_sebelum`,`stok_sesudah`,`referensi_tipe`,`referensi_id`,`keterangan`,`created_at`) SELECT `id_barang`,2,'KELUAR',3,675,672,'PENJUALAN',282,'Penjualan 21 Sep 2026','2026-09-21 17:15:00' FROM `barang` WHERE `kode_barang`='KML003' LIMIT 1;
 INSERT INTO `mutasi_stok` (`id_barang`,`id_user`,`tipe`,`qty`,`stok_sebelum`,`stok_sesudah`,`referensi_tipe`,`referensi_id`,`keterangan`,`created_at`) SELECT `id_barang`,2,'KELUAR',4,540,536,'PENJUALAN',282,'Penjualan 21 Sep 2026','2026-09-21 17:15:00' FROM `barang` WHERE `kode_barang`='KML037' LIMIT 1;
-INSERT INTO `mutasi_stok` (`id_barang`,`id_user`,`tipe`,`qty`,`stok_sebelum`,`stok_sesudah`,`referensi_tipe`,`referensi_id`,`keterangan`,`created_at`) SELECT `id_barang`,1,'PENYESUAIAN',625,629,4,'STOK_OPNAME',NULL,'Penyesuaian hasil stok opname akhir hari','2026-09-21 18:40:00' FROM `barang` WHERE `kode_barang`='KML005' LIMIT 1;
-INSERT INTO `mutasi_stok` (`id_barang`,`id_user`,`tipe`,`qty`,`stok_sebelum`,`stok_sesudah`,`referensi_tipe`,`referensi_id`,`keterangan`,`created_at`) SELECT `id_barang`,1,'PENYESUAIAN',591,594,3,'STOK_OPNAME',NULL,'Penyesuaian hasil stok opname akhir hari','2026-09-21 18:40:00' FROM `barang` WHERE `kode_barang`='KML012' LIMIT 1;
-INSERT INTO `mutasi_stok` (`id_barang`,`id_user`,`tipe`,`qty`,`stok_sebelum`,`stok_sesudah`,`referensi_tipe`,`referensi_id`,`keterangan`,`created_at`) SELECT `id_barang`,1,'PENYESUAIAN',570,575,5,'STOK_OPNAME',NULL,'Penyesuaian hasil stok opname akhir hari','2026-09-21 18:40:00' FROM `barang` WHERE `kode_barang`='KML027' LIMIT 1;
-INSERT INTO `mutasi_stok` (`id_barang`,`id_user`,`tipe`,`qty`,`stok_sebelum`,`stok_sesudah`,`referensi_tipe`,`referensi_id`,`keterangan`,`created_at`) SELECT `id_barang`,1,'PENYESUAIAN',549,551,2,'STOK_OPNAME',NULL,'Penyesuaian hasil stok opname akhir hari','2026-09-21 18:40:00' FROM `barang` WHERE `kode_barang`='KML039' LIMIT 1;
+INSERT INTO `mutasi_stok` (`id_barang`,`id_user`,`tipe`,`qty`,`stok_sebelum`,`stok_sesudah`,`referensi_tipe`,`referensi_id`,`keterangan`,`created_at`) SELECT `id_barang`,3,'PENYESUAIAN',1,5,4,'STOK_OPNAME',2,'Selisih fisik -1 pada stok opname','2026-09-21 18:40:00' FROM `barang` WHERE `kode_barang`='KML005' LIMIT 1;
+INSERT INTO `mutasi_stok` (`id_barang`,`id_user`,`tipe`,`qty`,`stok_sebelum`,`stok_sesudah`,`referensi_tipe`,`referensi_id`,`keterangan`,`created_at`) SELECT `id_barang`,3,'PENYESUAIAN',1,4,3,'STOK_OPNAME',2,'Selisih fisik -1 pada stok opname','2026-09-21 18:40:00' FROM `barang` WHERE `kode_barang`='KML012' LIMIT 1;
+INSERT INTO `mutasi_stok` (`id_barang`,`id_user`,`tipe`,`qty`,`stok_sebelum`,`stok_sesudah`,`referensi_tipe`,`referensi_id`,`keterangan`,`created_at`) SELECT `id_barang`,3,'PENYESUAIAN',1,6,5,'STOK_OPNAME',2,'Selisih fisik -1 pada stok opname','2026-09-21 18:40:00' FROM `barang` WHERE `kode_barang`='KML027' LIMIT 1;
+INSERT INTO `mutasi_stok` (`id_barang`,`id_user`,`tipe`,`qty`,`stok_sebelum`,`stok_sesudah`,`referensi_tipe`,`referensi_id`,`keterangan`,`created_at`) SELECT `id_barang`,3,'PENYESUAIAN',1,3,2,'STOK_OPNAME',2,'Selisih fisik -1 pada stok opname','2026-09-21 18:40:00' FROM `barang` WHERE `kode_barang`='KML039' LIMIT 1;
 UPDATE `barang` SET `stok`=564, `updated_at`='2026-09-21 18:40:00' WHERE `kode_barang`='KML001';
 UPDATE `barang` SET `stok`=590, `updated_at`='2026-09-21 18:40:00' WHERE `kode_barang`='KML002';
 UPDATE `barang` SET `stok`=672, `updated_at`='2026-09-21 18:40:00' WHERE `kode_barang`='KML003';
@@ -3603,21 +3689,231 @@ UPDATE `barang` SET `stok`=541, `updated_at`='2026-09-21 18:40:00' WHERE `kode_b
 UPDATE `barang` SET `stok`=614, `updated_at`='2026-09-21 18:40:00' WHERE `kode_barang`='KML048';
 UPDATE `barang` SET `stok`=507, `updated_at`='2026-09-21 18:40:00' WHERE `kode_barang`='KML049';
 UPDATE `barang` SET `stok`=541, `updated_at`='2026-09-21 18:40:00' WHERE `kode_barang`='KML050';
+
+
+-- ============================================================================
+-- PHASE 15 - COMPLETE DEMO / PRESENTATION DATA
+-- This block intentionally leaves every application table populated and prepares
+-- visible scenarios for manual demo: historical/current sales, all payment types,
+-- PO lifecycle, partial receiving, overdue PO, stock opname history, audit trail,
+-- low-stock/restock recommendations, and slow-moving inventory.
+-- ============================================================================
+
+-- --------------------------------------------------------------------------
+-- A. Decision-support sales: previous-equivalent-period + current-period data
+--    Final stock of KML005/KML012/KML027/KML039 is intentionally low, while
+--    recent demand is non-zero, so Pusat Keputusan can generate restock advice.
+-- --------------------------------------------------------------------------
+INSERT INTO `penjualan` (`id_penjualan`,`no_transaksi`,`tanggal`,`id_customer`,`id_user`,`total`,`metode_pembayaran`,`bayar`,`kembalian`) VALUES
+(283,CONCAT('TRX-DEMO-',DATE_FORMAT(DATE_SUB(CURDATE(),INTERVAL 40 DAY),'%Y%m%d'),'-P01'),TIMESTAMP(DATE_SUB(CURDATE(),INTERVAL 40 DAY),'10:10:00'),3,2,84000.00,'Tunai',100000.00,16000.00),
+(284,CONCAT('TRX-DEMO-',DATE_FORMAT(DATE_SUB(CURDATE(),INTERVAL 38 DAY),'%Y%m%d'),'-P02'),TIMESTAMP(DATE_SUB(CURDATE(),INTERVAL 38 DAY),'11:20:00'),5,2,14000.00,'QRIS',14000.00,0.00),
+(285,CONCAT('TRX-DEMO-',DATE_FORMAT(DATE_SUB(CURDATE(),INTERVAL 36 DAY),'%Y%m%d'),'-P03'),TIMESTAMP(DATE_SUB(CURDATE(),INTERVAL 36 DAY),'13:15:00'),7,2,58500.00,'Transfer',58500.00,0.00),
+(286,CONCAT('TRX-DEMO-',DATE_FORMAT(DATE_SUB(CURDATE(),INTERVAL 35 DAY),'%Y%m%d'),'-P04'),TIMESTAMP(DATE_SUB(CURDATE(),INTERVAL 35 DAY),'16:05:00'),9,2,118000.00,'Tunai',120000.00,2000.00),
+(287,CONCAT('TRX-DEMO-',DATE_FORMAT(DATE_SUB(CURDATE(),INTERVAL 6 DAY),'%Y%m%d'),'-C01'),TIMESTAMP(DATE_SUB(CURDATE(),INTERVAL 6 DAY),'09:35:00'),3,2,168000.00,'QRIS',168000.00,0.00),
+(288,CONCAT('TRX-DEMO-',DATE_FORMAT(DATE_SUB(CURDATE(),INTERVAL 4 DAY),'%Y%m%d'),'-C02'),TIMESTAMP(DATE_SUB(CURDATE(),INTERVAL 4 DAY),'12:15:00'),5,2,35000.00,'Transfer',35000.00,0.00),
+(289,CONCAT('TRX-DEMO-',DATE_FORMAT(DATE_SUB(CURDATE(),INTERVAL 3 DAY),'%Y%m%d'),'-C03'),TIMESTAMP(DATE_SUB(CURDATE(),INTERVAL 3 DAY),'15:40:00'),7,2,175500.00,'Tunai',200000.00,24500.00),
+(290,CONCAT('TRX-DEMO-',DATE_FORMAT(DATE_SUB(CURDATE(),INTERVAL 2 DAY),'%Y%m%d'),'-C04'),TIMESTAMP(DATE_SUB(CURDATE(),INTERVAL 2 DAY),'18:20:00'),9,2,236000.00,'QRIS',236000.00,0.00);
+
+INSERT INTO `detail_penjualan` (`id_penjualan`,`id_barang`,`qty`,`harga`,`harga_modal`,`subtotal`)
+SELECT 283,`id_barang`,6,14000.00,9500.00,84000.00 FROM `barang` WHERE `kode_barang`='KML005' LIMIT 1;
+INSERT INTO `detail_penjualan` (`id_penjualan`,`id_barang`,`qty`,`harga`,`harga_modal`,`subtotal`)
+SELECT 284,`id_barang`,4,3500.00,2600.00,14000.00 FROM `barang` WHERE `kode_barang`='KML012' LIMIT 1;
+INSERT INTO `detail_penjualan` (`id_penjualan`,`id_barang`,`qty`,`harga`,`harga_modal`,`subtotal`)
+SELECT 285,`id_barang`,3,19500.00,16500.00,58500.00 FROM `barang` WHERE `kode_barang`='KML027' LIMIT 1;
+INSERT INTO `detail_penjualan` (`id_penjualan`,`id_barang`,`qty`,`harga`,`harga_modal`,`subtotal`)
+SELECT 286,`id_barang`,4,29500.00,22000.00,118000.00 FROM `barang` WHERE `kode_barang`='KML039' LIMIT 1;
+INSERT INTO `detail_penjualan` (`id_penjualan`,`id_barang`,`qty`,`harga`,`harga_modal`,`subtotal`)
+SELECT 287,`id_barang`,12,14000.00,9500.00,168000.00 FROM `barang` WHERE `kode_barang`='KML005' LIMIT 1;
+INSERT INTO `detail_penjualan` (`id_penjualan`,`id_barang`,`qty`,`harga`,`harga_modal`,`subtotal`)
+SELECT 288,`id_barang`,10,3500.00,2600.00,35000.00 FROM `barang` WHERE `kode_barang`='KML012' LIMIT 1;
+INSERT INTO `detail_penjualan` (`id_penjualan`,`id_barang`,`qty`,`harga`,`harga_modal`,`subtotal`)
+SELECT 289,`id_barang`,9,19500.00,16500.00,175500.00 FROM `barang` WHERE `kode_barang`='KML027' LIMIT 1;
+INSERT INTO `detail_penjualan` (`id_penjualan`,`id_barang`,`qty`,`harga`,`harga_modal`,`subtotal`)
+SELECT 290,`id_barang`,8,29500.00,22000.00,236000.00 FROM `barang` WHERE `kode_barang`='KML039' LIMIT 1;
+
+-- Matching stock-out history for the four decision-support products.
+INSERT INTO `mutasi_stok` (`id_barang`,`id_user`,`tipe`,`qty`,`stok_sebelum`,`stok_sesudah`,`referensi_tipe`,`referensi_id`,`keterangan`,`created_at`)
+SELECT `id_barang`,2,'KELUAR',6,22,16,'PENJUALAN',283,'Penjualan demo periode pembanding',TIMESTAMP(DATE_SUB(CURDATE(),INTERVAL 40 DAY),'10:10:00') FROM `barang` WHERE `kode_barang`='KML005' LIMIT 1;
+INSERT INTO `mutasi_stok` (`id_barang`,`id_user`,`tipe`,`qty`,`stok_sebelum`,`stok_sesudah`,`referensi_tipe`,`referensi_id`,`keterangan`,`created_at`)
+SELECT `id_barang`,2,'KELUAR',4,17,13,'PENJUALAN',284,'Penjualan demo periode pembanding',TIMESTAMP(DATE_SUB(CURDATE(),INTERVAL 38 DAY),'11:20:00') FROM `barang` WHERE `kode_barang`='KML012' LIMIT 1;
+INSERT INTO `mutasi_stok` (`id_barang`,`id_user`,`tipe`,`qty`,`stok_sebelum`,`stok_sesudah`,`referensi_tipe`,`referensi_id`,`keterangan`,`created_at`)
+SELECT `id_barang`,2,'KELUAR',3,17,14,'PENJUALAN',285,'Penjualan demo periode pembanding',TIMESTAMP(DATE_SUB(CURDATE(),INTERVAL 36 DAY),'13:15:00') FROM `barang` WHERE `kode_barang`='KML027' LIMIT 1;
+INSERT INTO `mutasi_stok` (`id_barang`,`id_user`,`tipe`,`qty`,`stok_sebelum`,`stok_sesudah`,`referensi_tipe`,`referensi_id`,`keterangan`,`created_at`)
+SELECT `id_barang`,2,'KELUAR',4,14,10,'PENJUALAN',286,'Penjualan demo periode pembanding',TIMESTAMP(DATE_SUB(CURDATE(),INTERVAL 35 DAY),'16:05:00') FROM `barang` WHERE `kode_barang`='KML039' LIMIT 1;
+INSERT INTO `mutasi_stok` (`id_barang`,`id_user`,`tipe`,`qty`,`stok_sebelum`,`stok_sesudah`,`referensi_tipe`,`referensi_id`,`keterangan`,`created_at`)
+SELECT `id_barang`,2,'KELUAR',12,16,4,'PENJUALAN',287,'Penjualan demo pemicu rekomendasi restock',TIMESTAMP(DATE_SUB(CURDATE(),INTERVAL 6 DAY),'09:35:00') FROM `barang` WHERE `kode_barang`='KML005' LIMIT 1;
+INSERT INTO `mutasi_stok` (`id_barang`,`id_user`,`tipe`,`qty`,`stok_sebelum`,`stok_sesudah`,`referensi_tipe`,`referensi_id`,`keterangan`,`created_at`)
+SELECT `id_barang`,2,'KELUAR',10,13,3,'PENJUALAN',288,'Penjualan demo pemicu rekomendasi restock',TIMESTAMP(DATE_SUB(CURDATE(),INTERVAL 4 DAY),'12:15:00') FROM `barang` WHERE `kode_barang`='KML012' LIMIT 1;
+INSERT INTO `mutasi_stok` (`id_barang`,`id_user`,`tipe`,`qty`,`stok_sebelum`,`stok_sesudah`,`referensi_tipe`,`referensi_id`,`keterangan`,`created_at`)
+SELECT `id_barang`,2,'KELUAR',9,14,5,'PENJUALAN',289,'Penjualan demo pemicu rekomendasi restock',TIMESTAMP(DATE_SUB(CURDATE(),INTERVAL 3 DAY),'15:40:00') FROM `barang` WHERE `kode_barang`='KML027' LIMIT 1;
+INSERT INTO `mutasi_stok` (`id_barang`,`id_user`,`tipe`,`qty`,`stok_sebelum`,`stok_sesudah`,`referensi_tipe`,`referensi_id`,`keterangan`,`created_at`)
+SELECT `id_barang`,2,'KELUAR',8,10,2,'PENJUALAN',290,'Penjualan demo pemicu rekomendasi restock',TIMESTAMP(DATE_SUB(CURDATE(),INTERVAL 2 DAY),'18:20:00') FROM `barang` WHERE `kode_barang`='KML039' LIMIT 1;
+
+-- --------------------------------------------------------------------------
+-- B. Procurement lifecycle: overdue, partial receiving, draft, cancelled.
+-- --------------------------------------------------------------------------
+INSERT INTO `pembelian`
+(`id_pembelian`,`no_pembelian`,`tanggal`,`tanggal_target`,`id_supplier`,`id_user`,`total`,`catatan`,`status`,`ordered_at`,`cancelled_at`,`created_at`) VALUES
+(31,'PO-DEMO-OVERDUE',TIMESTAMP(DATE_SUB(CURDATE(),INTERVAL 9 DAY),'09:00:00'),DATE_SUB(CURDATE(),INTERVAL 5 DAY),2,5,1355000.00,'Demo PO melewati target penerimaan','DIORDER',TIMESTAMP(DATE_SUB(CURDATE(),INTERVAL 9 DAY),'09:10:00'),NULL,TIMESTAMP(DATE_SUB(CURDATE(),INTERVAL 9 DAY),'09:00:00')),
+(32,'PO-DEMO-PARTIAL',TIMESTAMP(DATE_SUB(CURDATE(),INTERVAL 2 DAY),'08:30:00'),DATE_ADD(CURDATE(),INTERVAL 2 DAY),3,5,208000.00,'Demo PO diterima sebagian untuk latihan Gudang','SEBAGIAN',TIMESTAMP(DATE_SUB(CURDATE(),INTERVAL 2 DAY),'08:35:00'),NULL,TIMESTAMP(DATE_SUB(CURDATE(),INTERVAL 2 DAY),'08:30:00')),
+(33,'PO-DEMO-DRAFT',TIMESTAMP(CURDATE(),'08:00:00'),DATE_ADD(CURDATE(),INTERVAL 4 DAY),4,5,345000.00,'Demo draft PO yang belum dikirim ke supplier','DRAFT',NULL,NULL,TIMESTAMP(CURDATE(),'08:00:00')),
+(34,'PO-DEMO-CANCELLED',TIMESTAMP(DATE_SUB(CURDATE(),INTERVAL 10 DAY),'10:00:00'),DATE_SUB(CURDATE(),INTERVAL 4 DAY),5,5,305000.00,'Demo PO dibatalkan sebelum penerimaan','DIBATALKAN',TIMESTAMP(DATE_SUB(CURDATE(),INTERVAL 10 DAY),'10:05:00'),TIMESTAMP(DATE_SUB(CURDATE(),INTERVAL 9 DAY),'14:20:00'),TIMESTAMP(DATE_SUB(CURDATE(),INTERVAL 10 DAY),'10:00:00'));
+
+INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`qty_diterima`,`harga_beli`,`subtotal`)
+SELECT 31,`id_barang`,50,0,13500.00,675000.00 FROM `barang` WHERE `kode_barang`='KML040' LIMIT 1;
+INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`qty_diterima`,`harga_beli`,`subtotal`)
+SELECT 31,`id_barang`,40,0,17000.00,680000.00 FROM `barang` WHERE `kode_barang`='KML041' LIMIT 1;
+INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`qty_diterima`,`harga_beli`,`subtotal`)
+SELECT 32,`id_barang`,20,8,6500.00,130000.00 FROM `barang` WHERE `kode_barang`='KML010' LIMIT 1;
+INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`qty_diterima`,`harga_beli`,`subtotal`)
+SELECT 32,`id_barang`,30,30,2600.00,78000.00 FROM `barang` WHERE `kode_barang`='KML011' LIMIT 1;
+INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`qty_diterima`,`harga_beli`,`subtotal`)
+SELECT 33,`id_barang`,40,0,4500.00,180000.00 FROM `barang` WHERE `kode_barang`='KML003' LIMIT 1;
+INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`qty_diterima`,`harga_beli`,`subtotal`)
+SELECT 33,`id_barang`,30,0,5500.00,165000.00 FROM `barang` WHERE `kode_barang`='KML006' LIMIT 1;
+INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`qty_diterima`,`harga_beli`,`subtotal`)
+SELECT 34,`id_barang`,10,0,13500.00,135000.00 FROM `barang` WHERE `kode_barang`='KML040' LIMIT 1;
+INSERT INTO `detail_pembelian` (`id_pembelian`,`id_barang`,`qty`,`qty_diterima`,`harga_beli`,`subtotal`)
+SELECT 34,`id_barang`,10,0,17000.00,170000.00 FROM `barang` WHERE `kode_barang`='KML041' LIMIT 1;
+
+-- Historical receiving for PO 29 (already reflected by the older stock-mutation seed).
+INSERT INTO `penerimaan_barang`
+(`id_penerimaan`,`no_penerimaan`,`id_pembelian`,`id_user`,`tanggal`,`no_surat_jalan`,`catatan`,`created_at`)
+VALUES (1,'GR-20260905-001',29,3,'2026-09-05 14:10:00','SJ-0905-029','Penerimaan lengkap PO historis untuk contoh histori','2026-09-05 14:10:00');
+INSERT INTO `detail_penerimaan_barang`
+(`id_penerimaan`,`id_detail_pembelian`,`id_barang`,`qty_diterima`,`harga_beli`,`subtotal`)
+SELECT 1,dp.`id_detail_pembelian`,dp.`id_barang`,dp.`qty`,dp.`harga_beli`,dp.`subtotal`
+FROM `detail_pembelian` dp WHERE dp.`id_pembelian`=29;
+
+-- Partial receiving for PO 32. Only physically received quantities affect stock.
+INSERT INTO `penerimaan_barang`
+(`id_penerimaan`,`no_penerimaan`,`id_pembelian`,`id_user`,`tanggal`,`no_surat_jalan`,`catatan`,`created_at`)
+VALUES (2,CONCAT('GR-',DATE_FORMAT(DATE_SUB(CURDATE(),INTERVAL 1 DAY),'%Y%m%d'),'-002'),32,3,TIMESTAMP(DATE_SUB(CURDATE(),INTERVAL 1 DAY),'14:25:00'),'SJ-DEMO-PARTIAL','Penerimaan parsial: satu item lengkap, satu item sebagian',TIMESTAMP(DATE_SUB(CURDATE(),INTERVAL 1 DAY),'14:25:00'));
+INSERT INTO `detail_penerimaan_barang`
+(`id_penerimaan`,`id_detail_pembelian`,`id_barang`,`qty_diterima`,`harga_beli`,`subtotal`)
+SELECT 2,dp.`id_detail_pembelian`,dp.`id_barang`,8,dp.`harga_beli`,8*dp.`harga_beli`
+FROM `detail_pembelian` dp JOIN `barang` b ON b.`id_barang`=dp.`id_barang`
+WHERE dp.`id_pembelian`=32 AND b.`kode_barang`='KML010' LIMIT 1;
+INSERT INTO `detail_penerimaan_barang`
+(`id_penerimaan`,`id_detail_pembelian`,`id_barang`,`qty_diterima`,`harga_beli`,`subtotal`)
+SELECT 2,dp.`id_detail_pembelian`,dp.`id_barang`,30,dp.`harga_beli`,30*dp.`harga_beli`
+FROM `detail_pembelian` dp JOIN `barang` b ON b.`id_barang`=dp.`id_barang`
+WHERE dp.`id_pembelian`=32 AND b.`kode_barang`='KML011' LIMIT 1;
+
+INSERT INTO `mutasi_stok` (`id_barang`,`id_user`,`tipe`,`qty`,`stok_sebelum`,`stok_sesudah`,`referensi_tipe`,`referensi_id`,`keterangan`,`created_at`)
+SELECT `id_barang`,3,'MASUK',8,`stok`,`stok`+8,'PENERIMAAN',2,'Goods Receiving parsial PO-DEMO-PARTIAL',TIMESTAMP(DATE_SUB(CURDATE(),INTERVAL 1 DAY),'14:25:00') FROM `barang` WHERE `kode_barang`='KML010' LIMIT 1;
+UPDATE `barang` SET `stok`=`stok`+8, `updated_at`=TIMESTAMP(DATE_SUB(CURDATE(),INTERVAL 1 DAY),'14:25:00') WHERE `kode_barang`='KML010';
+INSERT INTO `mutasi_stok` (`id_barang`,`id_user`,`tipe`,`qty`,`stok_sebelum`,`stok_sesudah`,`referensi_tipe`,`referensi_id`,`keterangan`,`created_at`)
+SELECT `id_barang`,3,'MASUK',30,`stok`,`stok`+30,'PENERIMAAN',2,'Goods Receiving parsial PO-DEMO-PARTIAL',TIMESTAMP(DATE_SUB(CURDATE(),INTERVAL 1 DAY),'14:25:00') FROM `barang` WHERE `kode_barang`='KML011' LIMIT 1;
+UPDATE `barang` SET `stok`=`stok`+30, `updated_at`=TIMESTAMP(DATE_SUB(CURDATE(),INTERVAL 1 DAY),'14:25:00') WHERE `kode_barang`='KML011';
+
+-- --------------------------------------------------------------------------
+-- C. Stock opname history: two finalized examples + one cancelled draft.
+--    No active DRAFT is left behind, so Gudang can immediately practice a new one.
+-- --------------------------------------------------------------------------
+INSERT INTO `stock_opname`
+(`id_opname`,`no_opname`,`tanggal`,`id_user`,`status`,`catatan`,`active_guard`,`finalized_by`,`finalized_at`,`cancelled_by`,`cancelled_at`,`created_at`) VALUES
+(1,CONCAT('OPN-',DATE_FORMAT(DATE_SUB(CURDATE(),INTERVAL 8 DAY),'%Y%m%d'),'-001'),TIMESTAMP(DATE_SUB(CURDATE(),INTERVAL 8 DAY),'18:00:00'),3,'FINALIZED','Opname berkala area rak kebutuhan harian',NULL,3,TIMESTAMP(DATE_SUB(CURDATE(),INTERVAL 8 DAY),'18:35:00'),NULL,NULL,TIMESTAMP(DATE_SUB(CURDATE(),INTERVAL 8 DAY),'18:00:00')),
+(2,'OPN-20260921-002','2026-09-21 18:20:00',3,'FINALIZED','Opname khusus item stok menipis sebelum reorder',NULL,3,'2026-09-21 18:40:00',NULL,NULL,'2026-09-21 18:20:00'),
+(3,CONCAT('OPN-',DATE_FORMAT(DATE_SUB(CURDATE(),INTERVAL 12 DAY),'%Y%m%d'),'-C01'),TIMESTAMP(DATE_SUB(CURDATE(),INTERVAL 12 DAY),'16:00:00'),3,'CANCELLED','Draft dibatalkan karena toko belum selesai beroperasi',NULL,NULL,NULL,3,TIMESTAMP(DATE_SUB(CURDATE(),INTERVAL 12 DAY),'16:15:00'),TIMESTAMP(DATE_SUB(CURDATE(),INTERVAL 12 DAY),'16:00:00'));
+
+INSERT INTO `stock_opname_detail` (`id_opname`,`id_barang`,`stok_sistem`,`stok_fisik`,`selisih`)
+SELECT 1,`id_barang`,540,538,-2 FROM `barang` WHERE `kode_barang`='KML020' LIMIT 1;
+INSERT INTO `stock_opname_detail` (`id_opname`,`id_barang`,`stok_sistem`,`stok_fisik`,`selisih`)
+SELECT 1,`id_barang`,541,541,0 FROM `barang` WHERE `kode_barang`='KML021' LIMIT 1;
+INSERT INTO `stock_opname_detail` (`id_opname`,`id_barang`,`stok_sistem`,`stok_fisik`,`selisih`)
+SELECT 1,`id_barang`,570,569,-1 FROM `barang` WHERE `kode_barang`='KML022' LIMIT 1;
+INSERT INTO `stock_opname_detail` (`id_opname`,`id_barang`,`stok_sistem`,`stok_fisik`,`selisih`)
+SELECT 1,`id_barang`,600,602,2 FROM `barang` WHERE `kode_barang`='KML023' LIMIT 1;
+INSERT INTO `stock_opname_detail` (`id_opname`,`id_barang`,`stok_sistem`,`stok_fisik`,`selisih`)
+SELECT 2,`id_barang`,5,4,-1 FROM `barang` WHERE `kode_barang`='KML005' LIMIT 1;
+INSERT INTO `stock_opname_detail` (`id_opname`,`id_barang`,`stok_sistem`,`stok_fisik`,`selisih`)
+SELECT 2,`id_barang`,4,3,-1 FROM `barang` WHERE `kode_barang`='KML012' LIMIT 1;
+INSERT INTO `stock_opname_detail` (`id_opname`,`id_barang`,`stok_sistem`,`stok_fisik`,`selisih`)
+SELECT 2,`id_barang`,6,5,-1 FROM `barang` WHERE `kode_barang`='KML027' LIMIT 1;
+INSERT INTO `stock_opname_detail` (`id_opname`,`id_barang`,`stok_sistem`,`stok_fisik`,`selisih`)
+SELECT 2,`id_barang`,3,2,-1 FROM `barang` WHERE `kode_barang`='KML039' LIMIT 1;
+INSERT INTO `stock_opname_detail` (`id_opname`,`id_barang`,`stok_sistem`,`stok_fisik`,`selisih`)
+SELECT 3,`id_barang`,`stok`,NULL,NULL FROM `barang` WHERE `kode_barang`='KML030' LIMIT 1;
+INSERT INTO `stock_opname_detail` (`id_opname`,`id_barang`,`stok_sistem`,`stok_fisik`,`selisih`)
+SELECT 3,`id_barang`,`stok`,NULL,NULL FROM `barang` WHERE `kode_barang`='KML031' LIMIT 1;
+
+-- Realistic small adjustments for opname #1. Current stock may differ because later
+-- transactions occurred after this historical count.
+INSERT INTO `mutasi_stok` (`id_barang`,`id_user`,`tipe`,`qty`,`stok_sebelum`,`stok_sesudah`,`referensi_tipe`,`referensi_id`,`keterangan`,`created_at`)
+SELECT `id_barang`,3,'PENYESUAIAN',2,540,538,'STOK_OPNAME',1,'Selisih fisik -2 pada opname berkala',TIMESTAMP(DATE_SUB(CURDATE(),INTERVAL 8 DAY),'18:35:00') FROM `barang` WHERE `kode_barang`='KML020' LIMIT 1;
+INSERT INTO `mutasi_stok` (`id_barang`,`id_user`,`tipe`,`qty`,`stok_sebelum`,`stok_sesudah`,`referensi_tipe`,`referensi_id`,`keterangan`,`created_at`)
+SELECT `id_barang`,3,'PENYESUAIAN',1,570,569,'STOK_OPNAME',1,'Selisih fisik -1 pada opname berkala',TIMESTAMP(DATE_SUB(CURDATE(),INTERVAL 8 DAY),'18:35:00') FROM `barang` WHERE `kode_barang`='KML022' LIMIT 1;
+INSERT INTO `mutasi_stok` (`id_barang`,`id_user`,`tipe`,`qty`,`stok_sebelum`,`stok_sesudah`,`referensi_tipe`,`referensi_id`,`keterangan`,`created_at`)
+SELECT `id_barang`,3,'PENYESUAIAN',2,600,602,'STOK_OPNAME',1,'Selisih fisik +2 pada opname berkala',TIMESTAMP(DATE_SUB(CURDATE(),INTERVAL 8 DAY),'18:35:00') FROM `barang` WHERE `kode_barang`='KML023' LIMIT 1;
+
+-- --------------------------------------------------------------------------
+-- D. Payment-simulation history: PAID + EXPIRED + CANCELLED + FAILED.
+-- --------------------------------------------------------------------------
+INSERT INTO `demo_payments`
+(`id_demo_payment`,`token`,`method`,`payment_reference`,`id_user`,`id_customer`,`amount`,`payload`,`status`,`expires_at`,`paid_at`,`cancelled_at`,`id_penjualan`,`created_at`) VALUES
+(1,SHA2('kamela-phase15-paid-qris-prev',256),'QRIS',CONCAT('QRD-',DATE_FORMAT(DATE_SUB(CURDATE(),INTERVAL 38 DAY),'%Y%m%d'),'-P02'),2,5,14000.00,JSON_OBJECT('seed','phase15','sale',284),'PAID',TIMESTAMP(DATE_SUB(CURDATE(),INTERVAL 38 DAY),'11:25:00'),TIMESTAMP(DATE_SUB(CURDATE(),INTERVAL 38 DAY),'11:21:00'),NULL,284,TIMESTAMP(DATE_SUB(CURDATE(),INTERVAL 38 DAY),'11:20:00')),
+(2,SHA2('kamela-phase15-paid-transfer-prev',256),'TRANSFER',CONCAT('TRF-',DATE_FORMAT(DATE_SUB(CURDATE(),INTERVAL 36 DAY),'%Y%m%d'),'-P03'),2,7,58500.00,JSON_OBJECT('seed','phase15','sale',285),'PAID',TIMESTAMP(DATE_SUB(CURDATE(),INTERVAL 36 DAY),'13:25:00'),TIMESTAMP(DATE_SUB(CURDATE(),INTERVAL 36 DAY),'13:18:00'),NULL,285,TIMESTAMP(DATE_SUB(CURDATE(),INTERVAL 36 DAY),'13:15:00')),
+(3,SHA2('kamela-phase15-paid-qris-current',256),'QRIS',CONCAT('QRD-',DATE_FORMAT(DATE_SUB(CURDATE(),INTERVAL 6 DAY),'%Y%m%d'),'-C01'),2,3,168000.00,JSON_OBJECT('seed','phase15','sale',287),'PAID',TIMESTAMP(DATE_SUB(CURDATE(),INTERVAL 6 DAY),'09:40:00'),TIMESTAMP(DATE_SUB(CURDATE(),INTERVAL 6 DAY),'09:36:00'),NULL,287,TIMESTAMP(DATE_SUB(CURDATE(),INTERVAL 6 DAY),'09:35:00')),
+(4,SHA2('kamela-phase15-paid-transfer-current',256),'TRANSFER',CONCAT('TRF-',DATE_FORMAT(DATE_SUB(CURDATE(),INTERVAL 4 DAY),'%Y%m%d'),'-C02'),2,5,35000.00,JSON_OBJECT('seed','phase15','sale',288),'PAID',TIMESTAMP(DATE_SUB(CURDATE(),INTERVAL 4 DAY),'12:25:00'),TIMESTAMP(DATE_SUB(CURDATE(),INTERVAL 4 DAY),'12:18:00'),NULL,288,TIMESTAMP(DATE_SUB(CURDATE(),INTERVAL 4 DAY),'12:15:00')),
+(5,SHA2('kamela-phase15-paid-qris-current-2',256),'QRIS',CONCAT('QRD-',DATE_FORMAT(DATE_SUB(CURDATE(),INTERVAL 2 DAY),'%Y%m%d'),'-C04'),2,9,236000.00,JSON_OBJECT('seed','phase15','sale',290),'PAID',TIMESTAMP(DATE_SUB(CURDATE(),INTERVAL 2 DAY),'18:25:00'),TIMESTAMP(DATE_SUB(CURDATE(),INTERVAL 2 DAY),'18:21:00'),NULL,290,TIMESTAMP(DATE_SUB(CURDATE(),INTERVAL 2 DAY),'18:20:00')),
+(6,SHA2('kamela-phase15-expired-qris',256),'QRIS',CONCAT('QRD-',DATE_FORMAT(DATE_SUB(CURDATE(),INTERVAL 1 DAY),'%Y%m%d'),'-EXP1'),2,NULL,42000.00,JSON_OBJECT('seed','phase15','scenario','expired'),'EXPIRED',TIMESTAMP(DATE_SUB(CURDATE(),INTERVAL 1 DAY),'10:05:00'),NULL,NULL,NULL,TIMESTAMP(DATE_SUB(CURDATE(),INTERVAL 1 DAY),'10:00:00')),
+(7,SHA2('kamela-phase15-cancelled-transfer',256),'TRANSFER',CONCAT('TRF-',DATE_FORMAT(DATE_SUB(CURDATE(),INTERVAL 1 DAY),'%Y%m%d'),'-CAN1'),2,11,87000.00,JSON_OBJECT('seed','phase15','scenario','cancelled'),'CANCELLED',TIMESTAMP(DATE_SUB(CURDATE(),INTERVAL 1 DAY),'13:10:00'),NULL,TIMESTAMP(DATE_SUB(CURDATE(),INTERVAL 1 DAY),'13:04:00'),NULL,TIMESTAMP(DATE_SUB(CURDATE(),INTERVAL 1 DAY),'13:00:00')),
+(8,SHA2('kamela-phase15-failed-transfer',256),'TRANSFER',CONCAT('TRF-',DATE_FORMAT(DATE_SUB(CURDATE(),INTERVAL 1 DAY),'%Y%m%d'),'-FLD1'),2,13,55000.00,JSON_OBJECT('seed','phase15','scenario','failed'),'FAILED',TIMESTAMP(DATE_SUB(CURDATE(),INTERVAL 1 DAY),'15:10:00'),NULL,NULL,NULL,TIMESTAMP(DATE_SUB(CURDATE(),INTERVAL 1 DAY),'15:00:00'));
+
+-- --------------------------------------------------------------------------
+-- E. Audit trail seed. These examples mirror real operational events so the
+--    Admin/Manager audit page is immediately meaningful after fresh import.
+-- --------------------------------------------------------------------------
+INSERT INTO `audit_logs`
+(`id_user`,`actor_username`,`actor_name`,`actor_role`,`action`,`entity_type`,`entity_id`,`entity_label`,`description`,`before_data`,`after_data`,`status`,`ip_address`,`user_agent`,`http_method`,`request_uri`,`created_at`) VALUES
+(1,'admin','Administrator KAMELA','admin','LOGIN_SUCCESS','AUTH','1','admin','Login administrator berhasil',NULL,NULL,'SUCCESS','127.0.0.1','KAMELA Demo Seed','POST','/login/process',TIMESTAMP(DATE_SUB(CURDATE(),INTERVAL 3 DAY),'07:55:00')),
+(5,'purchasing','Purchasing KAMELA','purchasing','PO_CREATED','PEMBELIAN','31','PO-DEMO-OVERDUE','Purchase Order dibuat',NULL,JSON_OBJECT('status','DRAFT','supplier_id',2),'SUCCESS','127.0.0.1','KAMELA Demo Seed','POST','/pembelian/simpan',TIMESTAMP(DATE_SUB(CURDATE(),INTERVAL 9 DAY),'09:00:00')),
+(5,'purchasing','Purchasing KAMELA','purchasing','PO_ORDERED','PEMBELIAN','31','PO-DEMO-OVERDUE','PO dikirim ke supplier',JSON_OBJECT('status','DRAFT'),JSON_OBJECT('status','DIORDER'),'SUCCESS','127.0.0.1','KAMELA Demo Seed','POST','/pembelian/31/order',TIMESTAMP(DATE_SUB(CURDATE(),INTERVAL 9 DAY),'09:10:00')),
+(3,'gudang','Staf Gudang KAMELA','gudang','GOODS_RECEIVED','PENERIMAAN_BARANG','2','PO-DEMO-PARTIAL','Penerimaan parsial barang dicatat',NULL,JSON_OBJECT('po',32,'status','SEBAGIAN'),'SUCCESS','127.0.0.1','KAMELA Demo Seed','POST','/penerimaan/simpan',TIMESTAMP(DATE_SUB(CURDATE(),INTERVAL 1 DAY),'14:25:00')),
+(3,'gudang','Staf Gudang KAMELA','gudang','STOCK_OPNAME_FINALIZED','STOCK_OPNAME','2','OPN-20260921-002','Stock opname difinalisasi',JSON_OBJECT('status','DRAFT'),JSON_OBJECT('status','FINALIZED','adjusted_items',4),'SUCCESS','127.0.0.1','KAMELA Demo Seed','POST','/stock-opname/2/finalize','2026-09-21 18:40:00'),
+(2,'kasir','Kasir Utama','kasir','PAYMENT_PAID','DEMO_PAYMENT','3','QR Payment Demo','Pembayaran QR demo berhasil',JSON_OBJECT('status','PENDING'),JSON_OBJECT('status','PAID','id_penjualan',287),'SUCCESS','127.0.0.1','KAMELA Demo Seed','POST','/penjualan/qris-demo/confirm',TIMESTAMP(DATE_SUB(CURDATE(),INTERVAL 6 DAY),'09:36:00')),
+(2,'kasir','Kasir Utama','kasir','TRANSFER_CONFIRMED','DEMO_PAYMENT','4','Transfer Demo','Transfer demo dikonfirmasi',JSON_OBJECT('status','PENDING'),JSON_OBJECT('status','PAID','id_penjualan',288),'SUCCESS','127.0.0.1','KAMELA Demo Seed','POST','/penjualan/transfer-demo/confirm',TIMESTAMP(DATE_SUB(CURDATE(),INTERVAL 4 DAY),'12:18:00')),
+(2,'kasir','Kasir Utama','kasir','PAYMENT_EXPIRED','DEMO_PAYMENT','6','QR Payment Demo','Pembayaran melewati masa berlaku',JSON_OBJECT('status','PENDING'),JSON_OBJECT('status','EXPIRED'),'SUCCESS','127.0.0.1','KAMELA Demo Seed','GET','/penjualan/qris-demo/status',TIMESTAMP(DATE_SUB(CURDATE(),INTERVAL 1 DAY),'10:06:00')),
+(2,'kasir','Kasir Utama','kasir','PAYMENT_CANCELLED','DEMO_PAYMENT','7','Transfer Demo','Pembayaran dibatalkan kasir',JSON_OBJECT('status','PENDING'),JSON_OBJECT('status','CANCELLED'),'SUCCESS','127.0.0.1','KAMELA Demo Seed','POST','/penjualan/payment/cancel',TIMESTAMP(DATE_SUB(CURDATE(),INTERVAL 1 DAY),'13:04:00')),
+(1,'admin','Administrator KAMELA','admin','USER_STATUS_CHANGED','USER','6','Kasir Cadangan','Akun pegawai dinonaktifkan',JSON_OBJECT('is_active',1),JSON_OBJECT('is_active',0),'SUCCESS','127.0.0.1','KAMELA Demo Seed','POST','/users/6/status',TIMESTAMP(DATE_SUB(CURDATE(),INTERVAL 5 DAY),'10:30:00')),
+(4,'manager','Manager KAMELA','manager','ROLE_ACCESS_DENIED','AUTHORIZATION','stock-opname','Stock Opname','Manager mencoba endpoint operasional yang tidak diizinkan',NULL,NULL,'BLOCKED','127.0.0.1','KAMELA Demo Seed','GET','/stock-opname/tambah',TIMESTAMP(DATE_SUB(CURDATE(),INTERVAL 2 DAY),'11:00:00')),
+(1,'admin','Administrator KAMELA','admin','BACKUP_CREATED','BACKUP',NULL,'KAMELA Backup V2','Backup data aplikasi berhasil dibuat',NULL,JSON_OBJECT('format','KAMELA_BACKUP_V2'),'SUCCESS','127.0.0.1','KAMELA Demo Seed','POST','/backup/create',TIMESTAMP(DATE_SUB(CURDATE(),INTERVAL 1 DAY),'17:45:00'));
+
+-- Keep deterministic low-stock final balance after all presentation history.
+UPDATE `barang` SET `stok`=4 WHERE `kode_barang`='KML005';
+UPDATE `barang` SET `stok`=3 WHERE `kode_barang`='KML012';
+UPDATE `barang` SET `stok`=5 WHERE `kode_barang`='KML027';
+UPDATE `barang` SET `stok`=2 WHERE `kode_barang`='KML039';
+
+-- End Phase 15 presentation data.
+
 COMMIT;
 SET FOREIGN_KEY_CHECKS = 1;
 
+
+
 -- ============================================================================
--- EXPECTED DEMO CONTENT
--- Categories          : 7
--- Products            : 50 (KML001-KML050)
--- Customers           : 25
--- Suppliers           : 10
--- Historical purchases: 29
--- Historical sales    : 282
--- Stock mutations     : 1277
--- Audit logs          : empty initially; filled by application activity
--- Stock opname        : empty initially; created through application workflow
--- History range       : Jan 2024 - 21 Sep 2026
--- Admin login         : admin / admin123
--- Cashier login       : kasir / kasir123
+-- PHASE 15 FRESH-IMPORT EXPECTATION
+-- Core master data     : 7 categories, 50 products, 25 customers, 10 suppliers
+-- Employee accounts    : 6 records (5 active demo roles + 1 inactive account)
+-- Sales history        : 290 transactions, including dynamic current/prior demos
+-- Procurement          : 34 POs with DRAFT/DIORDER/SEBAGIAN/DITERIMA/DIBATALKAN
+-- Goods receiving      : populated historical + partial receiving records
+-- Payment simulations  : PAID / EXPIRED / CANCELLED / FAILED history populated
+-- Stock mutation       : MASUK / KELUAR / PENYESUAIAN history populated
+-- Stock opname         : finalized history + cancelled draft history populated
+-- Audit trail          : representative login, PO, receiving, payment, user, backup events
+-- Decision support     : current sales, previous-period comparison, low stock,
+--                        restock recommendations, slow-moving items, active/overdue PO
+--
+-- Demo accounts:
+--   admin      / admin123
+--   kasir      / kasir123
+--   gudang     / gudang123
+--   purchasing / purchasing123
+--   manager    / manager123
+--
+-- Intended campus setup: clone project -> create/import pos_ci4 -> configure local .env
+-- -> php spark serve. No phase-by-phase SQL upgrade is required on a fresh database.
 -- ============================================================================
