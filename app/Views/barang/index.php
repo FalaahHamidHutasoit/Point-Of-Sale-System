@@ -35,6 +35,7 @@
 
             </a>
 
+            <?php if (in_array(session()->get('role'), ['admin','gudang'], true)): ?>
             <a href="<?= base_url('/barang/tambah') ?>"
                class="btn btn-primary btn-action">
 
@@ -42,6 +43,7 @@
                 Tambah Barang
 
             </a>
+            <?php endif; ?>
 
         </div>
 
@@ -416,19 +418,20 @@
 
                                     <div class="d-flex justify-content-center gap-2">
 
+                                        <?php if (in_array(session()->get('role'), ['admin','gudang'], true)): ?>
                                         <a href="<?= base_url('/barang/edit/' . $row['id_barang']) ?>"
                                            class="btn btn-outline-warning action-btn"
                                            title="Edit barang">
-
                                             <i class="bi bi-pencil"></i>
-
                                         </a>
+                                        <?php endif; ?>
 
-
+                                        <?php if (session()->get('role') === 'admin'): ?>
                                         <form method="post" action="<?= base_url('/barang/hapus/' . $row['id_barang']) ?>" class="d-inline" onsubmit="return confirm('Yakin ingin menghapus barang ini?')">
                                             <?= csrf_field() ?>
                                             <button class="btn btn-outline-danger action-btn" title="Hapus barang"><i class="bi bi-trash"></i></button>
                                         </form>
+                                        <?php endif; ?>
 
                                     </div>
 
@@ -469,13 +472,13 @@
 
                                     <?php if (empty($keyword)) : ?>
 
+                                        <?php if (in_array(session()->get('role'), ['admin','gudang'], true)): ?>
                                         <a href="<?= base_url('/barang/tambah') ?>"
                                            class="btn btn-primary btn-sm">
-
                                             <i class="bi bi-plus-lg me-1"></i>
                                             Tambah Barang
-
                                         </a>
+                                        <?php endif; ?>
 
                                     <?php else : ?>
 

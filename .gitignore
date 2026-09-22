@@ -32,3 +32,5 @@ writable/backups/
 /vendor/
 
 !.env.development.example
+
+/builds/

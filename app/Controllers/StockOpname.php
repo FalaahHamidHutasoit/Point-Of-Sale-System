@@ -35,7 +35,7 @@ class StockOpname extends BaseController
 
     public function create()
     {
-        if ($guard = $this->guardSensitivePost(['admin'])) {
+        if ($guard = $this->guardSensitivePost(['admin', 'gudang'])) {
             return $guard;
         }
 
@@ -137,7 +137,7 @@ class StockOpname extends BaseController
 
     public function saveCounts(int $id)
     {
-        if ($guard = $this->guardSensitivePost(['admin'])) {
+        if ($guard = $this->guardSensitivePost(['admin', 'gudang'])) {
             return $guard;
         }
 
@@ -207,7 +207,7 @@ class StockOpname extends BaseController
 
     public function finalize(int $id)
     {
-        if ($guard = $this->guardSensitivePost(['admin'])) {
+        if ($guard = $this->guardSensitivePost(['admin', 'gudang'])) {
             return $guard;
         }
 
@@ -314,7 +314,7 @@ class StockOpname extends BaseController
 
     public function cancel(int $id)
     {
-        if ($guard = $this->guardSensitivePost(['admin'])) {
+        if ($guard = $this->guardSensitivePost(['admin', 'gudang'])) {
             return $guard;
         }
 

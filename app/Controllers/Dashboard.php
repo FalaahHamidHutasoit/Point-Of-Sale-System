@@ -36,7 +36,17 @@ class Dashboard extends BaseController
             ->select('COALESCE(SUM(total), 0) AS total')
             ->where('DATE(tanggal) >=', $awalBulan)
             ->where('DATE(tanggal) <=', $akhirBulan)
+            ->where('status !=', 'DIBATALKAN')
             ->first();
+
+        $poMenunggu = (new PembelianModel())
+            ->whereIn('status', ['DIORDER', 'SEBAGIAN'])
+            ->countAllResults();
+
+        $penerimaanBulanIni = $db->table('penerimaan_barang')
+            ->where('DATE(tanggal) >=', $awalBulan)
+            ->where('DATE(tanggal) <=', $akhirBulan)
+            ->countAllResults();
 
         $stokMenipis = $barangModel
             ->select('barang.*, kategori.nama_kategori')
@@ -91,6 +101,8 @@ class Dashboard extends BaseController
             'transaksiBulanIni' => (int) ($penjualanBulanIni['jumlah'] ?? 0),
             'omzetBulanIni' => (float) ($penjualanBulanIni['omzet'] ?? 0),
             'pembelianBulanIni' => (float) ($pembelianBulanIni['total'] ?? 0),
+            'poMenunggu' => (int) $poMenunggu,
+            'penerimaanBulanIni' => (int) $penerimaanBulanIni,
             'stokMenipis' => $stokMenipis,
             'produkTerlaris' => $produkTerlaris,
             'transaksiTerbaru' => $transaksiTerbaru,

@@ -325,10 +325,12 @@
 
                                         </a>
 
+                                        <?php if (session()->get('role') === 'admin'): ?>
                                         <form method="post" action="<?= base_url('/customer/hapus/' . $row['id_customer']) ?>" class="d-inline" onsubmit="return confirm('Yakin ingin menghapus customer ini?')">
                                             <?= csrf_field() ?>
                                             <button class="btn btn-outline-danger btn-sm" title="Hapus Customer"><i class="bi bi-trash"></i></button>
                                         </form>
+                                        <?php endif; ?>
 
                                     </div>
 

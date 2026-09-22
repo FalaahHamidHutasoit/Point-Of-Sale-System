@@ -2,6 +2,7 @@
 
 namespace App\Filters;
 
+use App\Models\UserModel;
 use App\Services\AuditService;
 use CodeIgniter\Filters\FilterInterface;
 use CodeIgniter\HTTP\RequestInterface;
@@ -38,9 +39,30 @@ class AuthFilter implements FilterInterface
         }
 
         $actualFingerprint = hash('sha256', $request->getUserAgent()->getAgentString());
-
         if (!hash_equals($expectedFingerprint, $actualFingerprint)) {
             return $this->expireSession($request, 'SESSION_FINGERPRINT_MISMATCH', 'Sesi tidak valid. Silakan login kembali.');
+        }
+
+        // Phase 11: status/role akun dicek ke database di setiap request terautentikasi.
+        // Ini membuat penonaktifan akun atau perubahan role efektif tanpa menunggu sesi 8 jam habis.
+        $user = (new UserModel())->find((int) $session->get('id_user'));
+        if (!$user || (int) ($user['is_active'] ?? 1) !== 1) {
+            return $this->expireSession($request, 'SESSION_ACCOUNT_DISABLED', 'Akun tidak aktif atau tidak lagi tersedia. Silakan hubungi administrator.');
+        }
+
+        if (
+            (string) $user['username'] !== (string) $session->get('username')
+            || (string) $user['role'] !== (string) $session->get('role')
+        ) {
+            return $this->expireSession($request, 'SESSION_ACCOUNT_CHANGED', 'Data akses akun berubah. Silakan login kembali.');
+        }
+
+        $mustChange = (int) ($user['must_change_password'] ?? 0) === 1;
+        $session->set('must_change_password', $mustChange);
+        $path = trim($request->getUri()->getPath(), '/');
+        if ($mustChange && !in_array($path, ['account/password', 'logout'], true)) {
+            $session->set('last_activity', $now);
+            return redirect()->to('/account/password')->with('warning', 'Silakan ganti password sementara sebelum melanjutkan.');
         }
 
         $session->set('last_activity', $now);

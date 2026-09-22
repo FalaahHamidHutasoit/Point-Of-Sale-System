@@ -9,7 +9,8 @@ class PembelianModel extends Model
     protected $table = 'pembelian';
     protected $primaryKey = 'id_pembelian';
     protected $allowedFields = [
-        'no_pembelian', 'tanggal', 'id_supplier', 'id_user', 'total', 'catatan', 'created_at'
+        'no_pembelian', 'tanggal', 'tanggal_target', 'id_supplier', 'id_user', 'total', 'catatan',
+        'status', 'ordered_at', 'cancelled_at', 'created_at'
     ];
     protected $useTimestamps = false;
 }

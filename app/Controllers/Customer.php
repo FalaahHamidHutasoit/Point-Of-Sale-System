@@ -40,7 +40,7 @@ class Customer extends BaseController
 
     public function simpan()
     {
-        if ($guard = $this->guardSensitivePost(['admin'])) {
+        if ($guard = $this->guardSensitivePost(['admin', 'kasir'])) {
             return $guard;
         }
 
@@ -87,7 +87,7 @@ class Customer extends BaseController
 
     public function update($id)
     {
-        if ($guard = $this->guardSensitivePost(['admin'])) {
+        if ($guard = $this->guardSensitivePost(['admin', 'kasir'])) {
             return $guard;
         }
 

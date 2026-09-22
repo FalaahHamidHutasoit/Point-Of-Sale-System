@@ -40,7 +40,7 @@ class Supplier extends BaseController
 
     public function simpan()
     {
-        if ($guard = $this->guardSensitivePost(['admin'])) {
+        if ($guard = $this->guardSensitivePost(['admin', 'purchasing'])) {
             return $guard;
         }
 
@@ -87,7 +87,7 @@ class Supplier extends BaseController
 
     public function update($id)
     {
-        if ($guard = $this->guardSensitivePost(['admin'])) {
+        if ($guard = $this->guardSensitivePost(['admin', 'purchasing'])) {
             return $guard;
         }
 

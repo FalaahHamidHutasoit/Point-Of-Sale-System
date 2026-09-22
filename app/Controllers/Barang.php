@@ -52,7 +52,7 @@ class Barang extends BaseController
 
     public function simpan()
     {
-        if ($guard = $this->guardSensitivePost(['admin'])) {
+        if ($guard = $this->guardSensitivePost(['admin', 'gudang'])) {
             return $guard;
         }
 
@@ -172,7 +172,7 @@ class Barang extends BaseController
 
     public function update($id)
     {
-        if ($guard = $this->guardSensitivePost(['admin'])) {
+        if ($guard = $this->guardSensitivePost(['admin', 'gudang'])) {
             return $guard;
         }
 

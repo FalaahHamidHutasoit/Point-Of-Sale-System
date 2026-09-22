@@ -128,6 +128,31 @@ class Auth extends BaseController
             return $this->invalidCredentialsResponse();
         }
 
+        if ((int) ($user['is_active'] ?? 1) !== 1) {
+            $this->registerFailure($accountKey, self::ACCOUNT_MAX_FAILED_ATTEMPTS);
+            $this->registerFailure($ipKey, self::IP_MAX_FAILED_ATTEMPTS);
+
+            $this->auditEvent(
+                'LOGIN_INACTIVE_BLOCKED',
+                'AUTH',
+                (int) $user['id_user'],
+                (string) $user['username'],
+                'Login ditolak karena akun pegawai berstatus nonaktif.',
+                ['is_active' => 0],
+                null,
+                'BLOCKED',
+                [
+                    'id_user' => $user['id_user'],
+                    'username' => $user['username'],
+                    'name' => $user['nama_lengkap'],
+                    'role' => $user['role'],
+                ]
+            );
+
+            // Pesan tetap generik agar status akun tidak dapat dienumerasi dari login page.
+            return $this->invalidCredentialsResponse();
+        }
+
         // Login berhasil: reset counter gagal untuk identitas ini.
         $this->cache->delete($accountKey);
         $this->cache->delete($ipKey);
@@ -151,9 +176,14 @@ class Auth extends BaseController
             'username'            => $user['username'],
             'nama_lengkap'        => $user['nama_lengkap'],
             'role'                => $user['role'],
+            'must_change_password'=> (int) ($user['must_change_password'] ?? 0) === 1,
             'login_at'            => $now,
             'last_activity'       => $now,
             'session_fingerprint' => $this->currentFingerprint(),
+        ]);
+
+        $this->userModel->update((int) $user['id_user'], [
+            'last_login_at' => date('Y-m-d H:i:s'),
         ]);
 
         $this->auditEvent(
@@ -166,6 +196,10 @@ class Auth extends BaseController
             ['role' => $user['role']],
             'SUCCESS'
         );
+
+        if ((int) ($user['must_change_password'] ?? 0) === 1) {
+            return redirect()->to('/account/password')->with('warning', 'Silakan ganti password sementara sebelum melanjutkan.');
+        }
 
         return redirect()->to('/dashboard');
     }

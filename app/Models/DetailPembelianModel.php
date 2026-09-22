@@ -9,7 +9,7 @@ class DetailPembelianModel extends Model
     protected $table = 'detail_pembelian';
     protected $primaryKey = 'id_detail_pembelian';
     protected $allowedFields = [
-        'id_pembelian', 'id_barang', 'qty', 'harga_beli', 'subtotal'
+        'id_pembelian', 'id_barang', 'qty', 'qty_diterima', 'harga_beli', 'subtotal'
     ];
     protected $useTimestamps = false;
 }

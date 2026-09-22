@@ -18,10 +18,12 @@
             </p>
         </div>
 
+        <?php if (in_array(session()->get('role'), ['admin','purchasing'], true)): ?>
         <a href="<?= base_url('supplier/tambah') ?>" class="btn btn-primary btn-add">
             <i class="bi bi-plus-lg me-1"></i>
             Tambah Supplier
         </a>
+        <?php endif; ?>
     </div>
 
 
@@ -338,6 +340,7 @@
 
                                         <div class="action-buttons">
 
+                                            <?php if (in_array(session()->get('role'), ['admin','purchasing'], true)): ?>
                                             <a
                                                 href="<?= base_url('supplier/edit/' . $row['id_supplier']) ?>"
                                                 class="action-btn edit-btn"
@@ -345,11 +348,14 @@
                                             >
                                                 <i class="bi bi-pencil-square"></i>
                                             </a>
+                                            <?php endif; ?>
 
+                                            <?php if (session()->get('role') === 'admin'): ?>
                                             <form method="post" action="<?= base_url('supplier/hapus/' . $row['id_supplier']) ?>" class="d-inline" onsubmit="return confirm('Yakin ingin menghapus supplier ini?')">
                                                 <?= csrf_field() ?>
                                                 <button class="action-btn delete-btn border-0" title="Hapus supplier"><i class="bi bi-trash"></i></button>
                                             </form>
+                                            <?php endif; ?>
 
                                         </div>
 
