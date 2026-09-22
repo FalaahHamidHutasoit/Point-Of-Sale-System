@@ -37,7 +37,8 @@ class Barang extends BaseController
 
         return view('barang/index', [
             'title' => 'Data Barang',
-            'barang' => $builder->orderBy('barang.nama_barang', 'ASC')->findAll(),
+            'barang' => $builder->orderBy('barang.nama_barang', 'ASC')->paginate(15, 'barang'),
+            'pager' => $this->barangModel->pager,
             'keyword' => $keyword,
         ]);
     }
@@ -349,9 +350,29 @@ class Barang extends BaseController
                 ->groupEnd();
         }
 
+        $statsBuilder = \Config\Database::connect()->table('barang')
+            ->join('kategori', 'kategori.id_kategori = barang.id_kategori');
+        if ($keyword !== '') {
+            $statsBuilder->groupStart()
+                ->like('barang.kode_barang', $keyword)
+                ->orLike('barang.nama_barang', $keyword)
+                ->orLike('kategori.nama_kategori', $keyword)
+                ->groupEnd();
+        }
+        $stats = $statsBuilder
+            ->select("COUNT(*) AS total, SUM(CASE WHEN barang.stok > 5 THEN 1 ELSE 0 END) AS tersedia, SUM(CASE WHEN barang.stok BETWEEN 1 AND 5 THEN 1 ELSE 0 END) AS menipis, SUM(CASE WHEN barang.stok <= 0 THEN 1 ELSE 0 END) AS habis", false)
+            ->get()->getRowArray() ?? [];
+
         return view('laporan/barang', [
             'title' => 'Laporan Persediaan',
-            'barang' => $builder->orderBy('barang.nama_barang', 'ASC')->findAll(),
+            'barang' => $builder->orderBy('barang.nama_barang', 'ASC')->paginate(20, 'laporan_barang'),
+            'pager' => $this->barangModel->pager,
+            'stats' => [
+                'total' => (int) ($stats['total'] ?? 0),
+                'tersedia' => (int) ($stats['tersedia'] ?? 0),
+                'menipis' => (int) ($stats['menipis'] ?? 0),
+                'habis' => (int) ($stats['habis'] ?? 0),
+            ],
             'keyword' => $keyword,
         ]);
     }

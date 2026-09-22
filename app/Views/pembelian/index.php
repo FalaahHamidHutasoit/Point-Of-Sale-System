@@ -51,7 +51,7 @@ $statusMap = [
                         <td><?= esc($row['nama_lengkap']) ?></td>
                         <td><span class="badge text-bg-<?= esc($meta[1]) ?>"><?= esc($meta[0]) ?></span></td>
                         <td class="text-end fw-semibold">Rp <?= number_format($row['total'],0,',','.') ?></td>
-                        <td class="text-center"><a href="<?= base_url('pembelian/'.$row['id_pembelian']) ?>" class="btn btn-sm btn-outline-primary"><i class="bi bi-eye"></i></a></td>
+                        <td class="text-center"><a href="<?= base_url('pembelian/'.$row['id_pembelian']) ?>" class="btn btn-sm btn-outline-primary table-action" title="Lihat detail"><i class="bi bi-eye"></i></a></td>
                     </tr>
                 <?php endforeach; else: ?>
                     <tr><td colspan="7" class="text-center text-muted py-5"><i class="bi bi-clipboard2-x fs-2 d-block mb-2"></i>Belum ada purchase order.</td></tr>
@@ -59,6 +59,7 @@ $statusMap = [
                 </tbody>
             </table>
         </div>
+        <?= view('components/pagination', ['pager' => $pager ?? null, 'group' => 'pembelian', 'label' => 'purchase order']) ?>
     </div>
 </div>
 <?= view('layout/footer') ?>

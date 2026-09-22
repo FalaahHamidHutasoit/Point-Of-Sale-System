@@ -83,7 +83,7 @@ $progress = $orderedQty > 0 ? min(100, round(($receivedQty / $orderedQty) * 100)
         <div class="p-4 border-bottom"><h6 class="fw-bold mb-1">Riwayat Penerimaan</h6><small class="text-muted">Satu PO dapat diterima beberapa kali (partial receiving).</small></div>
         <div class="table-responsive"><table class="table mb-0"><thead><tr><th>No. Penerimaan</th><th>Tanggal</th><th>Petugas Gudang</th><th>Surat Jalan</th><th class="text-center">Aksi</th></tr></thead><tbody>
         <?php if ($penerimaan): foreach($penerimaan as $r): ?>
-            <tr><td class="fw-semibold"><?= esc($r['no_penerimaan']) ?></td><td><?= date('d M Y H:i',strtotime($r['tanggal'])) ?></td><td><?= esc($r['nama_lengkap']) ?></td><td><?= esc($r['no_surat_jalan'] ?: '-') ?></td><td class="text-center"><a class="btn btn-sm btn-outline-primary" href="<?= base_url('penerimaan/'.$r['id_penerimaan']) ?>"><i class="bi bi-eye"></i></a></td></tr>
+            <tr><td class="fw-semibold"><?= esc($r['no_penerimaan']) ?></td><td><?= date('d M Y H:i',strtotime($r['tanggal'])) ?></td><td><?= esc($r['nama_lengkap']) ?></td><td><?= esc($r['no_surat_jalan'] ?: '-') ?></td><td class="text-center"><a class="btn btn-sm btn-outline-primary table-action" href="<?= base_url('penerimaan/'.$r['id_penerimaan']) ?>"><i class="bi bi-eye"></i></a></td></tr>
         <?php endforeach; else: ?><tr><td colspan="5" class="text-center text-muted py-4">Belum ada barang yang diterima untuk PO ini.</td></tr><?php endif; ?>
         </tbody></table></div>
     </div>

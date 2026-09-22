@@ -17,7 +17,8 @@ class Kategori extends BaseController
     {
         return view('kategori/index', [
             'title' => 'Data Kategori',
-            'kategori' => $this->kategoriModel->orderBy('nama_kategori', 'ASC')->findAll(),
+            'kategori' => $this->kategoriModel->orderBy('nama_kategori', 'ASC')->paginate(15, 'kategori'),
+            'pager' => $this->kategoriModel->pager,
         ]);
     }
 

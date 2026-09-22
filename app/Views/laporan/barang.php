@@ -30,22 +30,10 @@
 
     <!-- SUMMARY -->
     <?php
-        $totalBarang = count($barang);
-        $stokTersedia = 0;
-        $stokMenipis = 0;
-        $stokHabis = 0;
-
-        foreach ($barang as $item) {
-
-            if ($item['stok'] <= 0) {
-                $stokHabis++;
-            } elseif ($item['stok'] <= 5) {
-                $stokMenipis++;
-            } else {
-                $stokTersedia++;
-            }
-
-        }
+        $totalBarang = (int) ($stats['total'] ?? 0);
+        $stokTersedia = (int) ($stats['tersedia'] ?? 0);
+        $stokMenipis = (int) ($stats['menipis'] ?? 0);
+        $stokHabis = (int) ($stats['habis'] ?? 0);
     ?>
 
     <div class="row g-3 mb-4">
@@ -357,7 +345,7 @@
 
                         <?php if (!empty($barang)): ?>
 
-                            <?php $no = 1; ?>
+                            <?php $no = isset($pager) ? (($pager->getCurrentPage('laporan_barang') - 1) * $pager->getPerPage('laporan_barang')) + 1 : 1; ?>
 
                             <?php foreach ($barang as $item): ?>
 
@@ -539,6 +527,8 @@
                 </table>
 
             </div>
+
+            <?= view('components/pagination', ['pager' => $pager ?? null, 'group' => 'laporan_barang', 'label' => 'barang']) ?>
 
         </div>
 

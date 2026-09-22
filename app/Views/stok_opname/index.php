@@ -44,7 +44,7 @@
                                 <?php elseif ($row['status'] === 'CANCELLED'): ?><?= esc($row['canceller'] ?: '-') ?> · <?= date('d M Y H:i', strtotime($row['cancelled_at'])) ?>
                                 <?php else: ?>Belum final<?php endif; ?>
                             </td>
-                            <td class="text-end"><a href="<?= base_url('stok/opname/' . $row['id_opname']) ?>" class="btn btn-sm btn-outline-primary">Buka</a></td>
+                            <td class="text-end"><a href="<?= base_url('stok/opname/' . $row['id_opname']) ?>" class="btn btn-sm btn-outline-primary table-action" title="Buka detail"><i class="bi bi-eye"></i></a></td>
                         </tr>
                     <?php endforeach; ?>
                 <?php else: ?>
@@ -53,6 +53,7 @@
                 </tbody>
             </table>
         </div>
+        <?= view('components/pagination', ['pager' => $pager ?? null, 'group' => 'opname', 'label' => 'stock opname']) ?>
     </div>
 </div>
 <?= view('layout/footer') ?>

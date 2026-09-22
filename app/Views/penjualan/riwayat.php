@@ -189,7 +189,7 @@
 
                 <span class="badge bg-primary rounded-pill px-3 py-2">
 
-                    <?= count($penjualan ?? []) ?> Transaksi
+                    <?= isset($pager) ? $pager->getTotal('penjualan') : count($penjualan ?? []) ?> Transaksi
 
                 </span>
 
@@ -250,7 +250,7 @@
 
                         <?php if (!empty($penjualan)): ?>
 
-                            <?php $no = 1; ?>
+                            <?php $no = isset($pager) ? (($pager->getCurrentPage('penjualan') - 1) * $pager->getPerPage('penjualan')) + 1 : 1; ?>
 
                             <?php foreach ($penjualan as $row): ?>
 
@@ -423,13 +423,11 @@
                                                 'penjualan/sukses/' .
                                                 $row['id_penjualan']
                                             ) ?>"
-                                            class="btn btn-sm btn-outline-primary"
+                                            class="btn btn-sm btn-outline-primary table-action"
                                             title="Lihat detail transaksi"
                                         >
 
-                                            <i class="bi bi-eye me-1"></i>
-
-                                            Detail
+                                            <i class="bi bi-eye"></i>
 
                                         </a>
 
@@ -510,6 +508,8 @@
 
             </div>
 
+            <?= view('components/pagination', ['pager' => $pager ?? null, 'group' => 'penjualan', 'label' => 'transaksi']) ?>
+
         </div>
 
     </div>
@@ -575,6 +575,7 @@
                     </tbody>
                 </table>
             </div>
+            <?= view('components/pagination', ['pager' => $paymentPager ?? null, 'group' => 'payment_attempts', 'label' => 'payment attempt']) ?>
         </div>
     </div>
 

@@ -48,7 +48,8 @@ class PenerimaanBarang extends BaseController
 
         return view('penerimaan/index', [
             'title' => 'Penerimaan Barang',
-            'rows' => $builder->orderBy('penerimaan_barang.tanggal', 'DESC')->findAll(),
+            'rows' => $builder->orderBy('penerimaan_barang.tanggal', 'DESC')->paginate(15, 'penerimaan'),
+            'pager' => $this->penerimaanModel->pager,
             'keyword' => $keyword,
         ]);
     }

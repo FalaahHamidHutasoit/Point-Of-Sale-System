@@ -73,10 +73,10 @@
                             </td>
                             <td class="text-end text-nowrap">
                                 <?php if ($backup['valid']): ?>
-                                    <a class="btn btn-sm btn-outline-primary" href="<?= base_url('system/backup/download/' . rawurlencode($backup['filename'])) ?>"><i class="bi bi-download"></i></a>
+                                    <a class="btn btn-sm btn-outline-primary table-action" href="<?= base_url('system/backup/download/' . rawurlencode($backup['filename'])) ?>"><i class="bi bi-download"></i></a>
                                     <button class="btn btn-sm btn-outline-warning" data-bs-toggle="modal" data-bs-target="#restoreModal" data-file="<?= esc($backup['filename'], 'attr') ?>"><i class="bi bi-arrow-counterclockwise"></i></button>
                                 <?php endif; ?>
-                                <button class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteModal" data-file="<?= esc($backup['filename'], 'attr') ?>"><i class="bi bi-trash"></i></button>
+                                <button class="btn btn-sm btn-outline-danger table-action" data-bs-toggle="modal" data-bs-target="#deleteModal" data-file="<?= esc($backup['filename'], 'attr') ?>"><i class="bi bi-trash3"></i></button>
                             </td>
                         </tr>
                     <?php endforeach; ?>

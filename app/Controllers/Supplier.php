@@ -28,7 +28,9 @@ class Supplier extends BaseController
 
         return view('supplier/index', [
             'title' => 'Data Supplier',
-            'supplier' => $builder->orderBy('id_supplier', 'DESC')->findAll(),
+            'supplier' => $builder->orderBy('id_supplier', 'DESC')->paginate(15, 'supplier'),
+            'pager' => $this->supplierModel->pager,
+            'supplierStats' => $this->supplierStats(),
             'keyword' => $keyword,
         ]);
     }
@@ -193,6 +195,22 @@ class Supplier extends BaseController
             log_message('error', 'Gagal menghapus supplier: {message}', ['message' => $e->getMessage()]);
             return redirect()->to('/supplier')->with('error', 'Supplier tidak dapat dihapus.');
         }
+    }
+
+    private function supplierStats(): array
+    {
+        $row = \Config\Database::connect()->query(
+            "SELECT COUNT(*) AS total,
+                    SUM(CASE WHEN no_telp IS NOT NULL AND no_telp <> '' THEN 1 ELSE 0 END) AS berkontak,
+                    SUM(CASE WHEN alamat IS NOT NULL AND alamat <> '' THEN 1 ELSE 0 END) AS beralamat
+             FROM supplier"
+        )->getRowArray() ?? [];
+
+        return [
+            'total' => (int) ($row['total'] ?? 0),
+            'berkontak' => (int) ($row['berkontak'] ?? 0),
+            'beralamat' => (int) ($row['beralamat'] ?? 0),
+        ];
     }
 
     private function validasiSupplier(string $nama, string $noTelp, string $alamat): ?string

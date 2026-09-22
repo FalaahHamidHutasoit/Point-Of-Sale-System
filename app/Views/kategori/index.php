@@ -132,7 +132,7 @@
 
                     <i class="bi bi-tags me-1"></i>
 
-                    <?= !empty($kategori) ? count($kategori) : 0 ?>
+                    <?= isset($pager) ? $pager->getTotal('kategori') : count($kategori ?? []) ?>
                     Kategori
 
                 </div>
@@ -174,7 +174,7 @@
 
                     <?php if (!empty($kategori)) : ?>
 
-                        <?php $no = 1; ?>
+                        <?php $no = isset($pager) ? (($pager->getCurrentPage('kategori') - 1) * $pager->getPerPage('kategori')) + 1 : 1; ?>
 
                         <?php foreach ($kategori as $row) : ?>
 
@@ -225,7 +225,7 @@
                                            class="btn btn-outline-warning btn-sm action-btn"
                                            title="Edit kategori">
 
-                                            <i class="bi bi-pencil"></i>
+                                            <i class="bi bi-pencil-square"></i>
 
                                         </a>
 
@@ -233,7 +233,7 @@
                                         <?php if (session()->get('role') === 'admin'): ?>
                                         <form method="post" action="<?= base_url('/kategori/hapus/' . $row['id_kategori']) ?>" class="d-inline" onsubmit="return confirm('Yakin ingin menghapus kategori ini?')">
                                             <?= csrf_field() ?>
-                                            <button class="btn btn-outline-danger btn-sm action-btn" title="Hapus kategori"><i class="bi bi-trash"></i></button>
+                                            <button class="btn btn-outline-danger btn-sm action-btn" title="Hapus kategori"><i class="bi bi-trash3"></i></button>
                                         </form>
                                         <?php endif; ?>
 
@@ -288,6 +288,8 @@
                 </table>
 
             </div>
+
+            <?= view('components/pagination', ['pager' => $pager ?? null, 'group' => 'kategori', 'label' => 'kategori']) ?>
 
         </div>
 

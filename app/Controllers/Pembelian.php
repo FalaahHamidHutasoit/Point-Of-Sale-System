@@ -49,11 +49,12 @@ class Pembelian extends BaseController
             $status = '';
         }
 
-        $rows = $builder->orderBy('pembelian.tanggal', 'DESC')->findAll();
+        $rows = $builder->orderBy('pembelian.tanggal', 'DESC')->paginate(15, 'pembelian');
 
         return view('pembelian/index', [
             'title' => 'Purchase Order',
             'pembelian' => $rows,
+            'pager' => $this->pembelianModel->pager,
             'keyword' => $keyword,
             'statusFilter' => $status,
         ]);

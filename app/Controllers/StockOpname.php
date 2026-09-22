@@ -25,11 +25,12 @@ class StockOpname extends BaseController
             ->join('users fu', 'fu.id_user = stock_opname.finalized_by', 'left')
             ->join('users cu', 'cu.id_user = stock_opname.cancelled_by', 'left')
             ->orderBy('stock_opname.id_opname', 'DESC')
-            ->findAll();
+            ->paginate(10, 'opname');
 
         return view('stok_opname/index', [
             'title' => 'Stock Opname',
             'opname' => $rows,
+            'pager' => $this->opnameModel->pager,
         ]);
     }
 

@@ -91,7 +91,7 @@
                         </small>
 
                         <h4 class="fw-bold mb-0">
-                            <?= count($customer) ?>
+                            <?= isset($pager) ? $pager->getTotal('customer') : count($customer ?? []) ?>
                         </h4>
 
                     </div>
@@ -189,7 +189,7 @@
                     </h5>
 
                     <small class="text-muted">
-                        Menampilkan <?= count($customer) ?> data customer
+                        Menampilkan <?= isset($pager) ? $pager->getTotal('customer') : count($customer ?? []) ?> data customer
                     </small>
                 </div>
 
@@ -228,7 +228,7 @@
 
                     <?php if (!empty($customer)) : ?>
 
-                        <?php $no = 1; ?>
+                        <?php $no = isset($pager) ? (($pager->getCurrentPage('customer') - 1) * $pager->getPerPage('customer')) + 1 : 1; ?>
 
                         <?php foreach ($customer as $row) : ?>
 
@@ -321,14 +321,14 @@
                                            class="btn btn-outline-warning btn-sm"
                                            title="Edit Customer">
 
-                                            <i class="bi bi-pencil"></i>
+                                            <i class="bi bi-pencil-square"></i>
 
                                         </a>
 
                                         <?php if (session()->get('role') === 'admin'): ?>
                                         <form method="post" action="<?= base_url('/customer/hapus/' . $row['id_customer']) ?>" class="d-inline" onsubmit="return confirm('Yakin ingin menghapus customer ini?')">
                                             <?= csrf_field() ?>
-                                            <button class="btn btn-outline-danger btn-sm" title="Hapus Customer"><i class="bi bi-trash"></i></button>
+                                            <button class="btn btn-outline-danger btn-sm" title="Hapus Customer"><i class="bi bi-trash3"></i></button>
                                         </form>
                                         <?php endif; ?>
 
@@ -381,6 +381,8 @@
                 </table>
 
             </div>
+
+            <?= view('components/pagination', ['pager' => $pager ?? null, 'group' => 'customer', 'label' => 'customer']) ?>
 
         </div>
 

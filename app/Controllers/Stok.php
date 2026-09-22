@@ -31,7 +31,8 @@ class Stok extends BaseController
 
         return view('stok/index', [
             'title' => 'Mutasi Stok',
-            'mutasi' => $builder->orderBy('mutasi_stok.id_mutasi', 'DESC')->findAll(),
+            'mutasi' => $builder->orderBy('mutasi_stok.id_mutasi', 'DESC')->paginate(25, 'mutasi'),
+            'pager' => $model->pager,
             'keyword' => $keyword,
             'tipe' => $tipe,
         ]);

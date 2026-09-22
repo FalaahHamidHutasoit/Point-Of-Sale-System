@@ -71,7 +71,7 @@
                     <small class="text-muted">Total Supplier</small>
 
                     <h4 class="fw-bold mb-0">
-                        <?= count($supplier ?? []) ?>
+                        <?= (int) ($supplierStats['total'] ?? (isset($pager) ? $pager->getTotal('supplier') : count($supplier ?? []))) ?>
                     </h4>
                 </div>
 
@@ -91,9 +91,7 @@
                     <small class="text-muted">Data Kontak</small>
 
                     <h4 class="fw-bold mb-0">
-                        <?= count(array_filter($supplier ?? [], function ($row) {
-                            return !empty($row['no_telp']);
-                        })) ?>
+                        <?= (int) ($supplierStats['berkontak'] ?? 0) ?>
                     </h4>
                 </div>
 
@@ -113,9 +111,7 @@
                     <small class="text-muted">Data Alamat</small>
 
                     <h4 class="fw-bold mb-0">
-                        <?= count(array_filter($supplier ?? [], function ($row) {
-                            return !empty($row['alamat']);
-                        })) ?>
+                        <?= (int) ($supplierStats['beralamat'] ?? 0) ?>
                     </h4>
                 </div>
 
@@ -144,7 +140,7 @@
             </div>
 
             <span class="supplier-count">
-                <?= count($supplier ?? []) ?> Supplier
+                <?= isset($pager) ? $pager->getTotal('supplier') : count($supplier ?? []) ?> Supplier
             </span>
 
         </div>
@@ -237,7 +233,7 @@
 
                         <?php if (!empty($supplier)): ?>
 
-                            <?php $no = 1; ?>
+                            <?php $no = isset($pager) ? (($pager->getCurrentPage('supplier') - 1) * $pager->getPerPage('supplier')) + 1 : 1; ?>
 
                             <?php foreach ($supplier as $row): ?>
 
@@ -353,7 +349,7 @@
                                             <?php if (session()->get('role') === 'admin'): ?>
                                             <form method="post" action="<?= base_url('supplier/hapus/' . $row['id_supplier']) ?>" class="d-inline" onsubmit="return confirm('Yakin ingin menghapus supplier ini?')">
                                                 <?= csrf_field() ?>
-                                                <button class="action-btn delete-btn border-0" title="Hapus supplier"><i class="bi bi-trash"></i></button>
+                                                <button class="action-btn delete-btn border-0" title="Hapus supplier"><i class="bi bi-trash3"></i></button>
                                             </form>
                                             <?php endif; ?>
 
@@ -407,6 +403,8 @@
                 </table>
 
             </div>
+
+            <?= view('components/pagination', ['pager' => $pager ?? null, 'group' => 'supplier', 'label' => 'supplier']) ?>
 
         </div>
 

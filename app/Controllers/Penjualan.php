@@ -1156,12 +1156,14 @@ class Penjualan extends BaseController
             ->join('customer', 'customer.id_customer = demo_payments.id_customer', 'left')
             ->join('users', 'users.id_user = demo_payments.id_user', 'left')
             ->orderBy('demo_payments.id_demo_payment', 'DESC')
-            ->findAll(30);
+            ->paginate(10, 'payment_attempts');
 
         return view('penjualan/riwayat', [
             'title' => 'Riwayat Penjualan',
-            'penjualan' => $builder->orderBy('penjualan.id_penjualan', 'DESC')->findAll(),
+            'penjualan' => $builder->orderBy('penjualan.id_penjualan', 'DESC')->paginate(15, 'penjualan'),
+            'pager' => $this->penjualanModel->pager,
             'paymentAttempts' => $paymentAttempts,
+            'paymentPager' => $this->demoPaymentModel->pager,
             'keyword' => $keyword,
         ]);
     }
@@ -1182,16 +1184,27 @@ class Penjualan extends BaseController
             $builder->where('DATE(penjualan.tanggal) <=', $tanggalAkhir);
         }
 
-        $rows = $builder->orderBy('penjualan.tanggal', 'DESC')->findAll();
-        $total = array_sum(array_map(static fn($row) => (float) $row['total'], $rows));
+        $summaryBuilder = \Config\Database::connect()->table('penjualan');
+        if ($tanggalMulai) {
+            $summaryBuilder->where('DATE(tanggal) >=', $tanggalMulai);
+        }
+        if ($tanggalAkhir) {
+            $summaryBuilder->where('DATE(tanggal) <=', $tanggalAkhir);
+        }
+        $summary = $summaryBuilder
+            ->select('COUNT(*) AS total_transaksi, COALESCE(SUM(total),0) AS total_penjualan', false)
+            ->get()->getRowArray() ?? [];
+
+        $rows = $builder->orderBy('penjualan.tanggal', 'DESC')->paginate(20, 'laporan_penjualan');
 
         return view('laporan/penjualan', [
             'title' => 'Laporan Penjualan',
             'penjualan' => $rows,
+            'pager' => $this->penjualanModel->pager,
             'tanggalMulai' => $tanggalMulai,
             'tanggalAkhir' => $tanggalAkhir,
-            'totalTransaksi' => count($rows),
-            'totalPenjualan' => $total,
+            'totalTransaksi' => (int) ($summary['total_transaksi'] ?? 0),
+            'totalPenjualan' => (float) ($summary['total_penjualan'] ?? 0),
         ]);
     }
 

@@ -205,7 +205,7 @@
 
                     <i class="bi bi-box-seam me-1"></i>
 
-                    <?= !empty($barang) ? count($barang) : 0 ?>
+                    <?= isset($pager) ? $pager->getTotal('barang') : count($barang ?? []) ?>
                     Barang
 
                 </div>
@@ -271,7 +271,7 @@
 
                     <?php if (!empty($barang)) : ?>
 
-                        <?php $no = 1; ?>
+                        <?php $no = isset($pager) ? (($pager->getCurrentPage('barang') - 1) * $pager->getPerPage('barang')) + 1 : 1; ?>
 
                         <?php foreach ($barang as $row) : ?>
 
@@ -422,14 +422,14 @@
                                         <a href="<?= base_url('/barang/edit/' . $row['id_barang']) ?>"
                                            class="btn btn-outline-warning action-btn"
                                            title="Edit barang">
-                                            <i class="bi bi-pencil"></i>
+                                            <i class="bi bi-pencil-square"></i>
                                         </a>
                                         <?php endif; ?>
 
                                         <?php if (session()->get('role') === 'admin'): ?>
                                         <form method="post" action="<?= base_url('/barang/hapus/' . $row['id_barang']) ?>" class="d-inline" onsubmit="return confirm('Yakin ingin menghapus barang ini?')">
                                             <?= csrf_field() ?>
-                                            <button class="btn btn-outline-danger action-btn" title="Hapus barang"><i class="bi bi-trash"></i></button>
+                                            <button class="btn btn-outline-danger action-btn" title="Hapus barang"><i class="bi bi-trash3"></i></button>
                                         </form>
                                         <?php endif; ?>
 
@@ -505,6 +505,8 @@
                 </table>
 
             </div>
+
+            <?= view('components/pagination', ['pager' => $pager ?? null, 'group' => 'barang', 'label' => 'barang']) ?>
 
         </div>
 

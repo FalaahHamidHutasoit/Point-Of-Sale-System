@@ -64,7 +64,7 @@ $prettyJson = static function (?string $json): ?string {
                 <input type="date" name="tanggal_akhir" class="form-control" value="<?= esc($tanggalAkhir) ?>">
             </div>
             <div class="col-xl-1 col-md-3 d-grid">
-                <button class="btn btn-outline-primary"><i class="bi bi-funnel"></i></button>
+                <button class="btn btn-outline-primary" title="Terapkan filter"><i class="bi bi-funnel me-1"></i>Filter</button>
             </div>
         </form>
     </div>
@@ -147,7 +147,7 @@ $prettyJson = static function (?string $json): ?string {
             </table>
         </div>
         <?php if ($pager): ?>
-            <div class="p-3 border-top"><?= $pager->links() ?></div>
+            <?= view('components/pagination', ['pager' => $pager, 'group' => 'default', 'label' => 'audit log']) ?>
         <?php endif; ?>
     </div>
 </div>

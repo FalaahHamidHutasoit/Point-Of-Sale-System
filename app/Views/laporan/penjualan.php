@@ -341,7 +341,7 @@
 
                         <?php if (!empty($penjualan)): ?>
 
-                            <?php $no = 1; ?>
+                            <?php $no = isset($pager) ? (($pager->getCurrentPage('laporan_penjualan') - 1) * $pager->getPerPage('laporan_penjualan')) + 1 : 1; ?>
 
                             <?php foreach ($penjualan as $row): ?>
 
@@ -551,6 +551,8 @@
                 </table>
 
             </div>
+
+            <?= view('components/pagination', ['pager' => $pager ?? null, 'group' => 'laporan_penjualan', 'label' => 'transaksi']) ?>
 
         </div>
 

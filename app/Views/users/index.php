@@ -42,7 +42,7 @@
                         <td><?php if ((int) $row['is_active'] === 1): ?><span class="badge badge-soft-success">Aktif</span><?php else: ?><span class="badge bg-secondary-subtle text-secondary">Nonaktif</span><?php endif; ?><?php if ((int) ($row['must_change_password'] ?? 0) === 1): ?><div class="small text-warning mt-1"><i class="bi bi-key"></i> Ganti password</div><?php endif; ?></td>
                         <td><span class="small"><?= $row['last_login_at'] ? esc(date('d M Y H:i', strtotime($row['last_login_at']))) : '<span class="text-muted">Belum pernah</span>' ?></span></td>
                         <td class="text-end text-nowrap">
-                            <a class="btn btn-sm btn-light border" href="<?= base_url('users/edit/' . $row['id_user']) ?>" title="Edit"><i class="bi bi-pencil"></i></a>
+                            <a class="btn btn-sm btn-light border" href="<?= base_url('users/edit/' . $row['id_user']) ?>" title="Edit"><i class="bi bi-pencil-square"></i></a>
                             <a class="btn btn-sm btn-light border" href="<?= base_url('users/reset-password/' . $row['id_user']) ?>" title="Reset password"><i class="bi bi-key"></i></a>
                             <form class="d-inline" method="post" action="<?= base_url('users/toggle-status/' . $row['id_user']) ?>" onsubmit="return confirm('Ubah status akun <?= esc(addslashes($row['username'])) ?>?')">
                                 <?= csrf_field() ?>
@@ -54,7 +54,7 @@
                 </tbody>
             </table>
         </div>
-        <?php if ($pager): ?><div class="p-3 border-top"><?= $pager->links('users', 'default_full') ?></div><?php endif; ?>
+        <?php if ($pager): ?><?= view('components/pagination', ['pager' => $pager, 'group' => 'users', 'label' => 'pegawai']) ?><?php endif; ?>
     </div>
 
     <div class="alert alert-light border mt-3 mb-0 small text-muted"><i class="bi bi-info-circle me-1"></i>Akun pegawai tidak dihapus permanen agar histori transaksi dan audit tetap dapat ditelusuri. Gunakan status <strong>Nonaktif</strong> untuk pegawai yang sudah tidak bekerja.</div>

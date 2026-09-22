@@ -28,7 +28,8 @@ class Customer extends BaseController
 
         return view('customer/index', [
             'title' => 'Data Customer',
-            'customer' => $builder->orderBy('id_customer', 'DESC')->findAll(),
+            'customer' => $builder->orderBy('id_customer', 'DESC')->paginate(15, 'customer'),
+            'pager' => $this->customerModel->pager,
             'keyword' => $keyword,
         ]);
     }
